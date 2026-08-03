@@ -119,6 +119,7 @@ body{
 }
 
 /* ---------- гараж ---------- */
+.garage-count{margin:0 0 12px;color:var(--muted);font-size:13px}
 .garage-list{display:flex;flex-direction:column;gap:12px;padding-bottom:20px}
 .car-card{
   display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:center;

@@ -105,6 +105,7 @@
 
   function renderGarage() {
     $('#garage-gems').textContent = save.gems.toLocaleString('ru-RU') + ' 💎';
+    $('#garage-count').textContent = 'Открыто ' + save.owned.length + ' из ' + window.CARS.length;
     const list = $('#garage-list');
     list.innerHTML = '';
     window.CARS.forEach(car => {

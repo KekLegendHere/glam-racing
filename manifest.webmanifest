@@ -8,6 +8,6 @@
   "background_color": "#1b0b2a",
   "theme_color": "#1b0b2a",
   "icons": [
-    { "src": "assets/cars/vesta.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+    { "src": "assets/cars/vesta.webp", "sizes": "512x512", "type": "image/webp", "purpose": "any" }
   ]
 }
