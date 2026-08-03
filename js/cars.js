@@ -84,8 +84,8 @@ window.CARS = [
   },
   {
     id: 'mustang', name: 'Мустанг', sub: 'в духе Ford Mustang fastback', price: 2450,
-    color: '#ff5f8f', speed: 9, handling: 6, magnet: 7,
-    note: 'Малиновый фастбек шестидесятых. Громкий во всех смыслах.'
+    color: '#2fb8b0', speed: 9, handling: 6, magnet: 7,
+    note: 'Бирюзовый фастбек шестидесятых. Громкий во всех смыслах.'
   },
   {
     id: 'defender', name: 'Дефендер', sub: 'в духе Land Rover Defender', price: 2650,
