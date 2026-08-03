@@ -1,0 +1,13 @@
+{
+  "name": "Glam Racing",
+  "short_name": "Glam Racing",
+  "description": "Аркадные гонки с российскими машинами",
+  "start_url": "./",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#1b0b2a",
+  "theme_color": "#1b0b2a",
+  "icons": [
+    { "src": "assets/cars/vesta.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any" }
+  ]
+}

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#1b0b2a">
+<meta name="description" content="Glam Racing — аркадные гонки с российскими машинами: Веста, Нива, Волга, Аурус и другие.">
+<title>Glam Racing — гонки на российских машинах</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💖</text></svg>">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ЗАГРУЗКА -->
+  <section class="screen is-active" id="screen-loading">
+    <div class="loader">
+      <div class="loader-heart">💖</div>
+      <p class="loader-text">Полируем машинки…</p>
+      <div class="loader-bar"><i id="loader-fill"></i></div>
+    </div>
+  </section>
+
+  <!-- МЕНЮ -->
+  <section class="screen" id="screen-menu">
+    <div class="hero" id="hero">
+      <div class="hero-inner">
+        <h1 class="title">Glam<span>Racing</span></h1>
+        <p class="subtitle">Российские машины. Розовый асфальт. Максимальный блеск.</p>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="stat-row">
+        <div class="stat"><span class="stat-label">Рекорд</span><b id="menu-best">0</b></div>
+        <div class="stat"><span class="stat-label">Кристаллы</span><b id="menu-gems">0 💎</b></div>
+      </div>
+
+      <div class="current-car" id="menu-car">
+        <div class="current-car-img"><img id="menu-car-img" alt=""></div>
+        <div class="current-car-info">
+          <span class="tag">Твоя машина</span>
+          <b id="menu-car-name">—</b>
+          <small id="menu-car-sub">—</small>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="btn-play">Поехали! 🏁</button>
+      <div class="btn-row">
+        <button class="btn btn-ghost" id="btn-garage">🚗 Гараж</button>
+        <button class="btn btn-ghost" id="btn-help">❔ Как играть</button>
+      </div>
+      <button class="btn btn-link" id="btn-sound">🔊 Звук: вкл</button>
+    </div>
+  </section>
+
+  <!-- ГАРАЖ -->
+  <section class="screen" id="screen-garage">
+    <header class="topbar">
+      <button class="icon-btn" data-back>←</button>
+      <h2>Гараж</h2>
+      <span class="gems-badge" id="garage-gems">0 💎</span>
+    </header>
+    <div class="garage-list" id="garage-list"></div>
+  </section>
+
+  <!-- КАК ИГРАТЬ -->
+  <section class="screen" id="screen-help">
+    <header class="topbar">
+      <button class="icon-btn" data-back>←</button>
+      <h2>Как играть</h2>
+      <span></span>
+    </header>
+    <div class="help">
+      <p><b>Веди пальцем</b> по экрану — машинка едет за пальцем. На компьютере — стрелки ← → или A/D.</p>
+      <p><b>💎 Кристаллы</b> — собирай, за них открываются новые машины в гараже.</p>
+      <p><b>⭐ Звезда</b> — ускорение на 4 секунды: неуязвимость и двойные очки.</p>
+      <p><b>💗 Сердечко</b> — плюс одна жизнь (максимум 3).</p>
+      <p><b>🚧 Конусы и встречные машины</b> — объезжай. Столкновение забирает жизнь.</p>
+      <p>Чем дальше едешь, тем быстрее трасса. Характеристики машины влияют на скорость, управляемость и радиус притяжения кристаллов.</p>
+    </div>
+  </section>
+
+  <!-- ИГРА -->
+  <section class="screen screen-game" id="screen-game">
+    <canvas id="canvas"></canvas>
+    <div class="hud">
+      <div class="hud-left">
+        <div class="hud-score" id="hud-score">0</div>
+        <div class="hud-sub"><span id="hud-speed">0</span> км/ч</div>
+      </div>
+      <div class="hud-right">
+        <div class="hud-gems" id="hud-gems">0 💎</div>
+        <div class="hud-lives" id="hud-lives"></div>
+      </div>
+      <button class="icon-btn hud-pause" id="btn-pause">❚❚</button>
+    </div>
+    <div class="touch-hint" id="touch-hint">Веди пальцем 👆</div>
+    <div class="boost-flash" id="boost-flash"></div>
+  </section>
+
+  <!-- ПАУЗА -->
+  <section class="screen screen-modal" id="screen-pause">
+    <div class="modal">
+      <h2>Пауза</h2>
+      <button class="btn btn-primary" id="btn-resume">Продолжить</button>
+      <button class="btn btn-ghost" id="btn-quit">В меню</button>
+    </div>
+  </section>
+
+  <!-- ФИНИШ -->
+  <section class="screen screen-modal" id="screen-over">
+    <div class="modal">
+      <div class="over-emoji" id="over-emoji">🏁</div>
+      <h2 id="over-title">Заезд окончен</h2>
+      <div class="over-score" id="over-score">0</div>
+      <p class="over-line" id="over-line">Собрано 0 💎</p>
+      <button class="btn btn-primary" id="btn-again">Ещё раз 🔁</button>
+      <div class="btn-row">
+        <button class="btn btn-ghost" id="btn-over-garage">🚗 Гараж</button>
+        <button class="btn btn-ghost" id="btn-over-menu">Меню</button>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script src="js/cars.js"></script>
+<script src="js/game.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
