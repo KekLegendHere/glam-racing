@@ -103,9 +103,9 @@
     /* --- скорость --- */
     speedFactor() {
       const growth = Math.min(1, this.dist / 9000);
-      const base = 0.95 + growth * 1.25;                       // 0.95 → 2.2
-      const carK = 0.86 + (this.car.speed || 7) * 0.028;        // 1.06 … 1.14
-      return base * carK * (this.boost > 0 ? 1.55 : 1);
+      const base = 0.56 + growth * 0.86;                        // 0.56 → 1.42
+      const carK = 0.60 + (this.car.speed || 7) * 0.047;        // 0.88 (6) … 1.07 (10)
+      return base * carK * (this.boost > 0 ? 1.42 : 1);
     },
 
     loop(now) {
@@ -182,8 +182,8 @@
             continue;
           }
         } else {
-          const ow = (o.type === 'cone' ? o.r * 1.6 : S * 0.42);
-          const oh = (o.type === 'cone' ? o.r * 1.6 : S * 0.72);
+          const ow = (o.type === 'hole' ? o.r * 1.7 : S * 0.42);
+          const oh = (o.type === 'hole' ? o.r * 1.7 * o.squash : S * 0.72);
           if (Math.abs(dx) < (hitW + ow) / 2 && Math.abs(dy) < (hitH + oh) / 2) {
             if (this.boost > 0) {
               this.burst(o.x, o.y, '#ffd166', 14);
@@ -236,16 +236,18 @@
         if (roll < 0.20 + hard * 0.18) {
           this.objects.push({
             kind: 'block', type: 'traffic', lane: l,
-            x: this.laneX(l) + rand(-this.laneW * 0.1, this.laneW * 0.1),
+            x: this.laneX(l) + rand(-this.laneW * 0.05, this.laneW * 0.05),
             y: -S, own: rand(0.42, 0.62),
             sprite: pick(window.CARS).id,
             hue: pick(['#8fb6ff', '#a0e7c4', '#ffc48f', '#d3b3ff', '#ff9aa8', '#bfc7d4'])
           });
         } else if (roll < 0.38 + hard * 0.16) {
           this.objects.push({
-            kind: 'block', type: 'cone',
-            x: this.laneX(l) + rand(-this.laneW * 0.15, this.laneW * 0.15),
-            y: -S, own: 0, r: S * 0.17
+            kind: 'block', type: 'hole',
+            x: this.laneX(l) + rand(-this.laneW * 0.12, this.laneW * 0.12),
+            y: -S, own: 0, r: S * rand(0.24, 0.31),
+            shape: Array.from({ length: 11 }, () => rand(0.72, 1.12)),
+            squash: rand(0.62, 0.82)
           });
         } else if (roll < 0.52) {
           this.spawnPickup(l);
@@ -316,7 +318,7 @@
         score: Math.floor(this.score),
         gems: this.gems,
         lives: this.lives,
-        speed: Math.round(this.speedFactor() * 110),
+        speed: Math.round(this.speedFactor() * 100),
         boost: this.boost > 0
       });
     },
@@ -380,7 +382,7 @@
       /* объекты */
       for (const o of this.objects) {
         if (o.kind === 'pickup') this.drawPickup(o);
-        else if (o.type === 'cone') this.drawCone(o);
+        else if (o.type === 'hole') this.drawHole(o);
         else this.drawCar(o.x, o.y, S, o.sprite, o.hue, 0, 1);
       }
 
@@ -490,18 +492,56 @@
       ctx.restore();
     },
 
-    drawCone(o) {
+    /* яма в асфальте: рваный контур + осыпавшийся край + глубина */
+    drawHole(o) {
       const ctx = this.ctx;
+      const pts = o.shape, n = pts.length;
+      const path = scale => {
+        ctx.beginPath();
+        for (let i = 0; i < n; i++) {
+          const a = (Math.PI * 2 / n) * i;
+          const rr = o.r * pts[i] * scale;
+          const x = Math.cos(a) * rr, y = Math.sin(a) * rr * o.squash;
+          if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+        }
+        ctx.closePath();
+      };
+
       ctx.save();
       ctx.translate(o.x, o.y);
-      ctx.fillStyle = 'rgba(0,0,0,0.3)';
-      ctx.beginPath(); ctx.ellipse(0, o.r * 0.75, o.r * 0.95, o.r * 0.35, 0, 0, 6.3); ctx.fill();
-      ctx.fillStyle = '#ff7a3d';
-      ctx.beginPath();
-      ctx.moveTo(0, -o.r); ctx.lineTo(o.r * 0.75, o.r * 0.7); ctx.lineTo(-o.r * 0.75, o.r * 0.7);
-      ctx.closePath(); ctx.fill();
-      ctx.fillStyle = '#fff';
-      ctx.fillRect(-o.r * 0.45, -o.r * 0.12, o.r * 0.9, o.r * 0.26);
+
+      /* крошево вокруг ямы */
+      ctx.fillStyle = 'rgba(255,214,240,0.20)';
+      path(1.26); ctx.fill();
+      ctx.fillStyle = 'rgba(120,80,150,0.45)';
+      path(1.10); ctx.fill();
+
+      /* сама дыра */
+      ctx.fillStyle = '#0b0512';
+      path(1); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+      ctx.lineWidth = Math.max(1.2, o.r * 0.07);
+      path(1); ctx.stroke();
+
+      /* подсвеченная передняя кромка — читается как глубина */
+      const g = ctx.createLinearGradient(0, -o.r * o.squash, 0, o.r * o.squash);
+      g.addColorStop(0, 'rgba(122,80,160,0.85)');
+      g.addColorStop(0.4, 'rgba(11,5,18,1)');
+      g.addColorStop(1, 'rgba(11,5,18,1)');
+      ctx.fillStyle = g;
+      path(0.92); ctx.fill();
+
+      /* трещины по асфальту */
+      ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+      ctx.lineWidth = Math.max(1, o.r * 0.045);
+      for (let i = 0; i < n; i += 3) {
+        const a = (Math.PI * 2 / n) * i;
+        const r0 = o.r * pts[i] * 1.05, r1 = r0 + o.r * (0.18 + pts[i] * 0.22);
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * r0, Math.sin(a) * r0 * o.squash);
+        ctx.lineTo(Math.cos(a) * r1, Math.sin(a) * r1 * o.squash);
+        ctx.stroke();
+      }
       ctx.restore();
     }
   };
