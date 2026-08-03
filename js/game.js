@@ -81,7 +81,8 @@
       this.objects = [];
       this.sparks = [];
       this.scroll = 0;
-      this.spawnGap = 0;
+      this.spawnGap = this.S * 2;
+      this.lastFree = null;
       this.touchX = null; this.usingTouch = false;
       this.keys = {};
       this.time = 0;
@@ -152,18 +153,28 @@
       this.spawnGap -= v * dt;
       if (this.spawnGap <= 0) {
         this.spawnRow();
-        const density = 1 - Math.min(0.45, this.dist / 20000);
-        this.spawnGap = this.S * rand(1.6, 3.0) * density + this.S * 0.9;
+        const density = 1 - Math.min(0.35, this.dist / 26000);
+        this.spawnGap = this.S * rand(2.2, 3.6) * density + this.S * 1.2;
       }
 
       /* --- объекты --- */
       const S = this.S;
+
+      /* машина не въезжает в попутную: догоняющая перенимает скорость передней */
+      for (const b of this.objects) {
+        if (b.type !== 'traffic') continue;
+        for (const a of this.objects) {
+          if (a === b || a.type !== 'traffic' || a.lane !== b.lane) continue;
+          if (a.y > b.y && a.y - b.y < S * 1.25) b.rel = a.rel;
+        }
+      }
       const magnetR = S * (0.35 + (this.car.magnet || 5) * 0.09);
       const hitW = S * 0.42, hitH = S * 0.72;
 
       for (let i = this.objects.length - 1; i >= 0; i--) {
         const o = this.objects[i];
-        o.y += (v - (o.own || 0) * this.H) * dt;
+        /* rel — доля скорости игрока: попутная машина всегда сползает вниз медленнее дороги */
+        o.y += v * (1 - (o.rel || 0)) * dt;
 
         if (o.y > this.H + S) { this.objects.splice(i, 1); continue; }
 
@@ -223,33 +234,52 @@
       this.pushHud();
     },
 
-    spawnRow() {
-      const free = (Math.random() * LANES) | 0;
+    /* полоса занята, если сверху ещё висит недавно заспавненный объект */
+    laneBusy(lane) {
       const S = this.S;
-      const hard = Math.min(1, this.dist / 12000);
+      for (const o of this.objects) {
+        if (o.lane === lane && o.y < S * 2.8) return true;
+      }
+      return false;
+    },
+
+    spawnRow() {
+      const S = this.S;
+      const hard = Math.min(1, this.dist / 16000);
+
+      /* коридор: свободная полоса всегда рядом с предыдущей, чтобы её успевали достичь */
+      const prev = this.lastFree == null ? 1 + ((Math.random() * 2) | 0) : this.lastFree;
+      const options = [prev - 1, prev, prev + 1].filter(l => l >= 0 && l < LANES);
+      const free = pick(options);
+      this.lastFree = free;
+      /* вторая свободная полоса — соседняя с первой */
+      const neighbours = [free - 1, free + 1].filter(l => l >= 0 && l < LANES);
+      const free2 = pick(neighbours);
+
       for (let l = 0; l < LANES; l++) {
-        if (l === free) {
-          if (Math.random() < 0.45) this.spawnPickup(l);
+        if (l === free || l === free2) {
+          if (Math.random() < 0.45 && !this.laneBusy(l)) this.spawnPickup(l);
           continue;
         }
+        if (this.laneBusy(l)) continue;                 // не накладываем препятствия друг на друга
         const roll = Math.random();
-        if (roll < 0.20 + hard * 0.18) {
+        if (roll < 0.34 + hard * 0.16) {
           this.objects.push({
             kind: 'block', type: 'traffic', lane: l,
             x: this.laneX(l) + rand(-this.laneW * 0.05, this.laneW * 0.05),
-            y: -S, own: rand(0.42, 0.62),
+            y: -S, rel: rand(0.35, 0.55),
             sprite: pick(window.CARS).id,
             hue: pick(['#8fb6ff', '#a0e7c4', '#ffc48f', '#d3b3ff', '#ff9aa8', '#bfc7d4'])
           });
-        } else if (roll < 0.38 + hard * 0.16) {
+        } else if (roll < 0.62 + hard * 0.14) {
           this.objects.push({
-            kind: 'block', type: 'hole',
+            kind: 'block', type: 'hole', lane: l,
             x: this.laneX(l) + rand(-this.laneW * 0.12, this.laneW * 0.12),
-            y: -S, own: 0, r: S * rand(0.24, 0.31),
+            y: -S, rel: 0, r: S * rand(0.24, 0.31),
             shape: Array.from({ length: 11 }, () => rand(0.72, 1.12)),
             squash: rand(0.62, 0.82)
           });
-        } else if (roll < 0.52) {
+        } else if (roll < 0.78) {
           this.spawnPickup(l);
         }
       }
@@ -264,9 +294,9 @@
       const n = type === 'gem' ? (1 + ((Math.random() * 2) | 0)) : 1;
       for (let i = 0; i < n; i++) {
         this.objects.push({
-          kind: 'pickup', type,
+          kind: 'pickup', type, lane,
           x: this.laneX(lane), y: -S - i * S * 0.55,
-          own: 0, r: S * (type === 'gem' ? 0.13 : 0.17), phase: Math.random() * 6.28
+          rel: 0, r: S * (type === 'gem' ? 0.13 : 0.17), phase: Math.random() * 6.28
         });
       }
     },
