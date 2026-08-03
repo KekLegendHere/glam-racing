@@ -82,7 +82,7 @@
       tick();
     };
     hero.onerror = tick;
-    hero.src = 'assets/ui/hero.jpg';
+    hero.src = 'assets/ui/hero.jpg?v=' + window.ASSET_V;
   }
 
   /* ---------------- меню ---------------- */
