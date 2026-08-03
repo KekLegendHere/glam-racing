@@ -85,22 +85,34 @@
     hero.src = 'assets/ui/hero.jpg?v=' + window.ASSET_V;
   }
 
+  /* ---------------- иконки предметов ---------------- */
+  /* Рисуем их движком, а не эмодзи: ребёнок видит в справке ровно те фигуры,
+     что встретит на трассе. Спрайты к этому моменту уже загружены. */
+  function paintIcons() {
+    const car = window.CAR_BY_ID[save.car] || window.CARS[0];
+    document.querySelectorAll('.help-icon').forEach(c =>
+      window.Game.renderIcon(c, c.dataset.icon, car));
+    window.Game.renderIcon($('#stat-gem-icon'), 'gem');
+  }
+
   /* ---------------- меню ---------------- */
   function renderMenu() {
     const car = window.CAR_BY_ID[save.car] || window.CARS[0];
     $('#menu-best').textContent = save.best.toLocaleString('ru-RU');
-    $('#menu-gems').textContent = save.gems.toLocaleString('ru-RU') + ' 💎';
+    $('#menu-gems').textContent = save.gems.toLocaleString('ru-RU');
     $('#menu-car-name').textContent = car.name;
     $('#menu-car-sub').textContent = car.sub;
     const img = $('#menu-car-img');
     img.src = window.CAR_SPRITE(car.id);
     img.alt = car.name;
-    $('#btn-sound').textContent = save.sound ? '🔊 Звук: вкл' : '🔇 Звук: выкл';
+    $('#btn-sound').textContent = save.sound ? '🔊 Звук' : '🔇 Звук';
+    paintIcons();
   }
 
   /* ---------------- гараж ---------------- */
-  function statBar(label, value) {
-    return '<div class="bar"><span>' + label + '</span><i><b style="width:' + (value * 10) + '%"></b></i></div>';
+  function statBar(icon, label, value) {
+    return '<div class="bar"><span><em>' + icon + '</em>' + label + '</span>' +
+           '<i><b style="width:' + (value * 10) + '%"></b></i></div>';
   }
 
   function renderGarage() {
@@ -122,9 +134,9 @@
           '</h3>' +
           '<p class="car-note">' + car.note + '</p>' +
           '<div class="bars">' +
-            statBar('Скорость', car.speed) +
-            statBar('Управление', car.handling) +
-            statBar('Магнит', car.magnet) +
+            statBar('🚀', 'Скорость', car.speed) +
+            statBar('🎯', 'Поворот', car.handling) +
+            statBar('🧲', 'Магнит', car.magnet) +
           '</div>' +
           '<button class="btn car-action">' +
             (selected ? 'Выбрана ✓' : owned ? 'Выбрать' : 'Купить за ' + car.price + ' 💎') +

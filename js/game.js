@@ -576,5 +576,31 @@
     }
   };
 
+  /* Иконка предмета для меню и подсказок — рисуется теми же функциями, что и в заезде,
+     поэтому картинка в справке всегда совпадает с тем, что видно на трассе.
+     Вызывать только вне заезда: на время отрисовки подменяется контекст. */
+  Game.renderIcon = function (canvas, type, car) {
+    const size = canvas.width;
+    const ctx = canvas.getContext('2d');
+    const keep = { ctx: this.ctx, S: this.S, time: this.time };
+    this.ctx = ctx; this.S = size; this.time = 0;
+    ctx.clearRect(0, 0, size, size);
+    const c = size / 2;
+
+    if (type === 'hole') {
+      this.drawHole({
+        x: c, y: c, r: size * 0.34, squash: 0.72,
+        shape: [1.05, 0.82, 1.1, 0.9, 1.0, 0.78, 1.08, 0.88, 1.02, 0.85, 0.95]
+      });
+    } else if (type === 'car') {
+      const m = car || window.CARS[0];
+      this.drawCar(c, c, size * 0.98, m.id, m.color, 0, 1);
+    } else {
+      this.drawPickup({ x: c, y: c, r: size * 0.3, type, phase: 0 });
+    }
+
+    this.ctx = keep.ctx; this.S = keep.S; this.time = keep.time;
+  };
+
   window.Game = Game;
 })();

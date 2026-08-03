@@ -8,7 +8,7 @@
 <title>Glam Racing — гонки на российских машинах</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💖</text></svg>">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="styles.css?v=2">
+<link rel="stylesheet" href="styles.css?v=3">
 </head>
 <body>
 
@@ -34,8 +34,14 @@
 
     <div class="panel">
       <div class="stat-row">
-        <div class="stat"><span class="stat-label">Рекорд</span><b id="menu-best">0</b></div>
-        <div class="stat"><span class="stat-label">Кристаллы</span><b id="menu-gems">0 💎</b></div>
+        <div class="stat">
+          <span class="stat-emoji">🏆</span>
+          <div><span class="stat-label">Рекорд</span><b id="menu-best">0</b></div>
+        </div>
+        <div class="stat">
+          <canvas class="stat-icon" id="stat-gem-icon" width="40" height="40" aria-hidden="true"></canvas>
+          <div><span class="stat-label">Кристаллы</span><b id="menu-gems">0</b></div>
+        </div>
       </div>
 
       <div class="current-car" id="menu-car">
@@ -47,12 +53,21 @@
         </div>
       </div>
 
-      <button class="btn btn-primary" id="btn-play">Поехали! 🏁</button>
+      <button class="btn btn-primary btn-play" id="btn-play">
+        <img class="btn-pic" src="assets/ui/ic-play.webp?v=3" alt="">
+        <span>Поехали!</span>
+      </button>
       <div class="btn-row">
-        <button class="btn btn-ghost" id="btn-garage">🚗 Гараж</button>
-        <button class="btn btn-ghost" id="btn-help">❔ Как играть</button>
+        <button class="btn btn-tile" id="btn-garage">
+          <img class="btn-pic" src="assets/ui/ic-garage.webp?v=3" alt="">
+          <span>Гараж</span>
+        </button>
+        <button class="btn btn-tile" id="btn-help">
+          <img class="btn-pic" src="assets/ui/ic-help.webp?v=3" alt="">
+          <span>Как играть</span>
+        </button>
       </div>
-      <button class="btn btn-link" id="btn-sound">🔊 Звук: вкл</button>
+      <button class="btn btn-link" id="btn-sound">🔊 Звук</button>
     </div>
   </section>
 
@@ -75,12 +90,30 @@
       <span></span>
     </header>
     <div class="help">
-      <p><b>Веди пальцем</b> по экрану — машинка едет за пальцем. На компьютере — стрелки ← → или A/D.</p>
-      <p><b>💎 Кристаллы</b> — собирай, за них открываются новые машины в гараже.</p>
-      <p><b>⭐ Звезда</b> — ускорение на 4 секунды: неуязвимость и двойные очки.</p>
-      <p><b>💗 Сердечко</b> — плюс одна жизнь (максимум 3).</p>
-      <p><b>🕳 Ямы в асфальте и другие машины</b> — объезжай. Столкновение забирает жизнь. На ускорении ямы не страшны.</p>
-      <p>Чем дальше едешь, тем быстрее трасса. Характеристики машины влияют на скорость, управляемость и радиус притяжения кристаллов.</p>
+      <div class="help-card">
+        <img class="help-pic" src="assets/ui/ic-help.webp?v=3" alt="">
+        <div><b>Веди пальцем</b><span>Машинка едет за пальцем. На компьютере — стрелки ← →</span></div>
+      </div>
+      <div class="help-card help-good">
+        <canvas class="help-icon" data-icon="gem" width="72" height="72" aria-hidden="true"></canvas>
+        <div><b>Собирай кристаллы</b><span>За них в гараже открываются новые машины</span></div>
+      </div>
+      <div class="help-card help-good">
+        <canvas class="help-icon" data-icon="star" width="72" height="72" aria-hidden="true"></canvas>
+        <div><b>Звезда — ускорение</b><span>Четыре секунды летишь сквозь всё и очки идут вдвойне</span></div>
+      </div>
+      <div class="help-card help-good">
+        <canvas class="help-icon" data-icon="heart" width="72" height="72" aria-hidden="true"></canvas>
+        <div><b>Сердечко — жизнь</b><span>Прибавляет одну жизнь, больше трёх не бывает</span></div>
+      </div>
+      <div class="help-card help-bad">
+        <canvas class="help-icon" data-icon="hole" width="72" height="72" aria-hidden="true"></canvas>
+        <div><b>Объезжай ямы</b><span>Упадёшь — потеряешь жизнь. На ускорении ямы не страшны</span></div>
+      </div>
+      <div class="help-card help-bad">
+        <canvas class="help-icon" data-icon="car" width="72" height="72" aria-hidden="true"></canvas>
+        <div><b>Объезжай машины</b><span>Столкновение тоже забирает жизнь</span></div>
+      </div>
     </div>
   </section>
 
@@ -129,8 +162,8 @@
 </div>
 
 <!-- ?v= поднимать при каждом заметном обновлении: иначе телефон показывает старую версию из кэша -->
-<script src="js/cars.js?v=2"></script>
-<script src="js/game.js?v=2"></script>
-<script src="js/app.js?v=2"></script>
+<script src="js/cars.js?v=3"></script>
+<script src="js/game.js?v=3"></script>
+<script src="js/app.js?v=3"></script>
 </body>
 </html>
