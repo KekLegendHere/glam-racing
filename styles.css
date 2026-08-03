@@ -162,6 +162,48 @@ body{
   color:var(--gold);font-weight:800;
 }
 
+/* ---------- уровни ---------- */
+.level-list{display:flex;flex-direction:column;gap:10px;padding-bottom:20px}
+.level-card{
+  display:grid;grid-template-columns:46px 1fr auto;gap:12px;align-items:center;
+  background:var(--card);border:1px solid var(--stroke);border-radius:18px;padding:12px 14px;
+  border-left:5px solid var(--lv,var(--pink));cursor:pointer;
+  transition:transform .12s,background .15s;
+}
+.level-card:active{transform:scale(.985)}
+.level-card.is-done{background:rgba(255,209,102,.10)}
+.level-card.is-locked{opacity:.5;cursor:default;border-left-color:var(--stroke)}
+.level-num{
+  width:46px;height:46px;border-radius:14px;display:grid;place-items:center;
+  background:rgba(255,255,255,.10);font-size:19px;font-weight:900;
+}
+.level-body{display:flex;flex-direction:column;gap:2px;min-width:0}
+.level-body b{font-size:16px}
+.level-hint,.level-meta{font-size:12px;color:var(--muted)}
+.level-meta{opacity:.85}
+.level-stars{font-size:13px;letter-spacing:1px;white-space:nowrap}
+
+/* полоса прогресса трека поверх заезда */
+.track-bar{
+  position:absolute;left:14px;right:14px;top:calc(64px + var(--safe-t));
+  height:20px;pointer-events:none;
+}
+/* Жёлоб рисуем фоном самой полосы, заливку — отдельным элементом слева.
+   Задавать ему сразу left и right нельзя: тогда ширина берётся из них, а не из width. */
+.track-bar::before{
+  content:'';position:absolute;left:0;right:0;bottom:0;height:5px;border-radius:99px;
+  background:rgba(255,255,255,.16);
+}
+.track-bar i{
+  position:absolute;left:0;bottom:0;height:5px;width:0;border-radius:99px;
+  background:linear-gradient(90deg,var(--pink),var(--gold));transition:width .1s linear;
+}
+.track-bar b{
+  display:block;font-size:11px;font-weight:700;color:var(--pink-soft);
+  text-align:center;text-shadow:0 2px 8px rgba(0,0,0,.7);
+}
+.over-stars{font-size:30px;letter-spacing:4px}
+
 /* ---------- помощь ---------- */
 .help{display:flex;flex-direction:column;gap:12px;padding-bottom:24px}
 .help-card{

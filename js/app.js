@@ -6,14 +6,52 @@
   const KEY = 'glam-racing-v1';
 
   /* ---------------- сохранение ---------------- */
-  const defaults = { gems: 0, best: 0, owned: ['vesta'], car: 'vesta', sound: true };
+  const defaults = { gems: 0, best: 0, owned: ['vesta'], car: 'vesta', sound: true, levels: {}, name: '' };
   let save = Object.assign({}, defaults);
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) save = Object.assign({}, defaults, JSON.parse(raw));
   } catch (e) { /* приватный режим — играем без сохранения */ }
   if (!save.owned.includes('vesta')) save.owned.push('vesta');
+  if (!save.levels) save.levels = {};
   const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) {} };
+
+  /* Облако платформы — прогресс переезжает между устройствами.
+     Локальное хранилище остаётся ведущим: облако может быть недоступно. */
+  let cloudTimer = 0;
+  function syncCloud() {
+    clearTimeout(cloudTimer);
+    cloudTimer = setTimeout(() => window.Platform.cloudSave(JSON.stringify(save)), 400);
+  }
+
+  /** Берёт облачный прогресс, если он богаче локального (больше звёзд и кристаллов). */
+  async function loadCloud() {
+    const raw = await window.Platform.cloudLoad();
+    if (!raw) return;
+    try {
+      const remote = JSON.parse(raw);
+      const stars = s => Object.values((s && s.levels) || {}).reduce((n, l) => n + (l.stars || 0), 0);
+      const richer = stars(remote) > stars(save) ||
+                     (stars(remote) === stars(save) && (remote.gems || 0) > save.gems);
+      if (richer) {
+        save = Object.assign({}, defaults, remote);
+        if (!save.owned.includes('vesta')) save.owned.push('vesta');
+        if (!save.levels) save.levels = {};
+        persist();
+      }
+    } catch (e) { console.warn('[cloud] прогресс не разобран', e); }
+  }
+
+  /* Уровень открыт, если предыдущий пройден хотя бы на одну звезду. */
+  function unlocked(levelId) {
+    const i = window.LEVELS.findIndex(l => l.id === levelId);
+    if (i <= 0) return true;
+    const prev = save.levels[window.LEVELS[i - 1].id];
+    return !!(prev && prev.stars > 0);
+  }
+
+  const totalStars = () =>
+    Object.values(save.levels).reduce((n, l) => n + (l.stars || 0), 0);
 
   /* ---------------- звук ---------------- */
   let actx = null;
@@ -170,6 +208,36 @@
     });
   }
 
+  /* ---------------- уровни ---------------- */
+  function renderLevels() {
+    $('#levels-stars').textContent = totalStars() + ' ⭐';
+    const list = $('#level-list');
+    list.innerHTML = '';
+
+    window.LEVELS.forEach((level, i) => {
+      const done = save.levels[level.id];
+      const open = unlocked(level.id);
+      const rival = window.Ghosts.rival(level.id);
+      const el = document.createElement('div');
+      el.className = 'level-card' + (open ? '' : ' is-locked') + (done && done.stars ? ' is-done' : '');
+      el.style.setProperty('--lv', level.theme.kerb);
+      el.innerHTML =
+        '<div class="level-num">' + (open ? (i + 1) : '🔒') + '</div>' +
+        '<div class="level-body">' +
+          '<b>' + level.name + '</b>' +
+          '<span class="level-hint">' + (open ? level.hint : 'Пройди предыдущий уровень') + '</span>' +
+          '<span class="level-meta">♪ ' + level.bpm + ' BPM' +
+            (rival ? ' · 👻 ' + rival.name : '') + '</span>' +
+        '</div>' +
+        '<div class="level-stars">' +
+          '⭐'.repeat(done ? done.stars : 0) + '☆'.repeat(3 - (done ? done.stars : 0)) +
+        '</div>';
+
+      if (open) el.addEventListener('click', () => { closeOverlay(); startRace(level); });
+      list.appendChild(el);
+    });
+  }
+
   /* ---------------- игра ---------------- */
   const canvas = $('#canvas');
   window.Game.init(canvas);
@@ -178,12 +246,17 @@
         hudLives = $('#hud-lives'), hudSpeed = $('#hud-speed'),
         boostFlash = $('#boost-flash'), touchHint = $('#touch-hint');
 
+  const trackFill = $('#track-fill');
+
   window.Game.onHud = s => {
     hudScore.textContent = s.score.toLocaleString('ru-RU');
-    hudGems.textContent = s.gems + ' 💎';
+    hudGems.textContent = s.mode === 'level'
+      ? s.gems + ' / ' + s.totalGems + ' 💎'
+      : s.gems + ' 💎';
     hudLives.textContent = '💖'.repeat(Math.max(0, s.lives));
     hudSpeed.textContent = s.speed;
     boostFlash.classList.toggle('on', s.boost);
+    if (s.mode === 'level') trackFill.style.width = (s.progress * 100).toFixed(1) + '%';
   };
   window.Game.onTouchStart = () => touchHint.classList.add('hidden');
   window.Game.onPickup = type => {
@@ -193,69 +266,173 @@
   };
   window.Game.onCrash = () => beep(140, 0.28, 'sawtooth', 0.09);
 
+  let lastGhost = null;          // призрак только что пройденного уровня — для вызова друга
+
   window.Game.onOver = res => {
     save.gems += res.gems;
-    const record = res.score > save.best;
-    if (record) save.best = res.score;
     persist();
-    $('#over-emoji').textContent = record ? '👑' : '🏁';
-    $('#over-title').textContent = record ? 'Новый рекорд!' : 'Заезд окончен';
-    $('#over-score').textContent = res.score.toLocaleString('ru-RU');
-    $('#over-line').textContent = 'Собрано ' + res.gems + ' 💎 · дистанция ' + res.dist + ' м';
+    const levelRun = !!res.level;
+
+    if (levelRun) onLevelFinished(res);
+    else {
+      const record = res.score > save.best;
+      if (record) save.best = res.score;
+      persist();
+      $('#over-emoji').textContent = record ? '👑' : '🏁';
+      $('#over-title').textContent = record ? 'Новый рекорд!' : 'Заезд окончен';
+      $('#over-stars').hidden = true;
+      $('#btn-next').hidden = true;
+      $('#btn-challenge').hidden = true;
+      $('#over-score').textContent = res.score.toLocaleString('ru-RU');
+      $('#over-line').textContent = 'Собрано ' + res.gems + ' 💎 · дистанция ' + res.dist + ' м';
+      beep(record ? 660 : 300, 0.3, record ? 'triangle' : 'sine', 0.08);
+      if (record) setTimeout(() => beep(990, 0.35, 'triangle', 0.08), 200);
+      window.Platform.submitScore('endless', res.score);
+    }
+    syncCloud();
     overlay('over');
-    beep(record ? 660 : 300, 0.3, record ? 'triangle' : 'sine', 0.08);
-    if (record) setTimeout(() => beep(990, 0.35, 'triangle', 0.08), 200);
   };
 
-  function startRace() {
+  /** Итог уровня: звёзды, разблокировка следующего, сохранение призрака. */
+  function onLevelFinished(res) {
+    const prev = save.levels[res.level] || { stars: 0, score: 0 };
+    const idx = window.LEVELS.findIndex(l => l.id === res.level);
+
+    if (res.win) {
+      save.levels[res.level] = {
+        stars: Math.max(prev.stars, res.stars),
+        score: Math.max(prev.score, res.score)
+      };
+      /* Призрака держим только за лучший заезд — с ним и поедет следующая попытка. */
+      if (res.ghost && res.score >= prev.score) {
+        res.ghost.name = playerName();
+        window.Ghosts.save(res.level, res.ghost);
+        lastGhost = res.ghost;
+      }
+      persist();
+      window.Platform.submitScore('level_' + res.level, res.score);
+    }
+
+    const next = window.LEVELS[idx + 1];
+    $('#over-emoji').textContent = res.win ? (res.stars === 3 ? '🌟' : '🏁') : '💔';
+    $('#over-title').textContent = res.win ? 'Уровень пройден!' : 'Не доехала…';
+    $('#over-stars').hidden = false;
+    $('#over-stars').textContent = '⭐'.repeat(res.stars) + '☆'.repeat(3 - res.stars);
+    $('#over-score').textContent = res.score.toLocaleString('ru-RU');
+    $('#over-line').textContent = res.win
+      ? 'Кристаллы: ' + res.gems + ' из ' + res.totalGems
+      : 'Собрано ' + res.gems + ' 💎 — попробуй ещё раз';
+    $('#btn-next').hidden = !(res.win && next && unlocked(next.id));
+    $('#btn-challenge').hidden = !(res.win && lastGhost);
+    nextLevelId = next ? next.id : null;
+  }
+
+  let nextLevelId = null;
+
+  function playerName() {
+    return window.Platform.getUserName() || save.name || 'Ты';
+  }
+
+  let currentLevel = null;
+
+  function startRace(level) {
     const car = window.CAR_BY_ID[save.car] || window.CARS[0];
+    currentLevel = level || null;
     show('game');
+    window.Game.playerName = playerName();
     touchHint.classList.remove('hidden');
     setTimeout(() => touchHint.classList.add('hidden'), 3200);
-    requestAnimationFrame(() => window.Game.start(car));
+    const bar = $('#track-bar');
+    bar.hidden = !level;
+    if (level) $('#track-name').textContent = level.name + ' · ' + level.bpm + ' BPM';
+    window.Music.setMuted(!save.sound);
+    requestAnimationFrame(() => window.Game.start(car, level));
     beep(520, 0.1); setTimeout(() => beep(780, 0.14), 110);
   }
 
   function quitToMenu() {
     window.Game.stop();
+    window.Music.stop();
     closeOverlay();
     renderMenu();
     show('menu');
   }
 
   /* ---------------- события ---------------- */
-  $('#btn-play').addEventListener('click', startRace);
+  $('#btn-play').addEventListener('click', () => startRace(null));
+  $('#btn-levels').addEventListener('click', () => { renderLevels(); show('levels'); });
   $('#btn-garage').addEventListener('click', () => { renderGarage(); show('garage'); });
   $('#btn-help').addEventListener('click', () => show('help'));
   $('#btn-sound').addEventListener('click', () => {
-    save.sound = !save.sound; persist(); renderMenu(); beep(700, 0.1);
+    save.sound = !save.sound; persist(); renderMenu();
+    window.Music.setMuted(!save.sound);
+    beep(700, 0.1);
+  });
+
+  $('#btn-next').addEventListener('click', () => {
+    const level = window.LEVEL_BY_ID[nextLevelId];
+    if (level) { closeOverlay(); startRace(level); }
+  });
+
+  /* Вызов друга: ссылка с записью заезда. Открывший её поедет против призрака. */
+  $('#btn-challenge').addEventListener('click', async () => {
+    if (!lastGhost) return;
+    const link = window.Ghosts.challengeLink(lastGhost);
+    const text = 'Обгони меня в Glam Racing! Мой результат: ' + lastGhost.score;
+    const res = await window.Platform.shareLink(link, text);
+    if (res === 'copied') toast('Ссылка скопирована 👻');
+    else if (!res) {
+      try { await navigator.clipboard.writeText(link); toast('Ссылка скопирована 👻'); }
+      catch (e) { toast('Не получилось поделиться'); }
+    }
   });
   document.querySelectorAll('[data-back]').forEach(b =>
     b.addEventListener('click', () => { renderMenu(); show('menu'); }));
 
-  $('#btn-pause').addEventListener('click', () => { window.Game.pause(); overlay('pause'); });
-  $('#btn-resume').addEventListener('click', () => { closeOverlay(); window.Game.resume(); });
+  const pauseRace = () => { window.Game.pause(); window.Music.pause(); overlay('pause'); };
+  const resumeRace = () => { closeOverlay(); window.Music.resume(); window.Game.resume(); };
+  $('#btn-pause').addEventListener('click', pauseRace);
+  $('#btn-resume').addEventListener('click', resumeRace);
   $('#btn-quit').addEventListener('click', quitToMenu);
 
-  $('#btn-again').addEventListener('click', () => { closeOverlay(); startRace(); });
+  $('#btn-again').addEventListener('click', () => { closeOverlay(); startRace(currentLevel); });
   $('#btn-over-menu').addEventListener('click', quitToMenu);
   $('#btn-over-garage').addEventListener('click', () => {
     window.Game.stop(); closeOverlay(); renderGarage(); show('garage');
   });
 
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden && window.Game.running && !window.Game.paused) {
-      window.Game.pause(); overlay('pause');
-    }
+    if (document.hidden && window.Game.running && !window.Game.paused) pauseRace();
   });
   window.addEventListener('keydown', e => {
     if (e.key === 'Escape' && window.Game.running) {
-      if (window.Game.paused) { closeOverlay(); window.Game.resume(); }
-      else { window.Game.pause(); overlay('pause'); }
+      if (window.Game.paused) resumeRace(); else pauseRace();
     }
   });
 
-  /* ---------------- старт ---------------- */
+  /* ---------------- старт ----------------
+     Порядок важен: сперва платформа (она даёт имя игрока и облачный прогресс),
+     потом картинки, и только затем говорим платформе, что игра готова. */
   renderMenu();
-  loadSprites(() => { renderMenu(); show('menu'); });
+
+  const challenge = window.Ghosts.fromUrl();
+
+  (async () => {
+    try { await window.Platform.init(); } catch (e) {}
+    try { await loadCloud(); } catch (e) {}
+    if (!save.name) { save.name = window.Platform.getUserName(); persist(); }
+    renderMenu();
+    loadSprites(() => {
+      renderMenu();
+      window.Platform.notifyGameReady();
+      if (challenge && window.LEVEL_BY_ID[challenge.level]) {
+        /* Пришли по ссылке-вызову: открываем список уровней и подсвечиваем нужный. */
+        renderLevels();
+        show('levels');
+        toast('Тебя вызвал ' + challenge.name + ' 👻');
+      } else {
+        show('menu');
+      }
+    });
+  })();
 })();

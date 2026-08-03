@@ -8,7 +8,7 @@
 <title>Glam Racing — гонки на российских машинах</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💖</text></svg>">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="styles.css?v=3">
+<link rel="stylesheet" href="styles.css?v=5">
 </head>
 <body>
 
@@ -53,20 +53,21 @@
         </div>
       </div>
 
-      <button class="btn btn-primary btn-play" id="btn-play">
-        <img class="btn-pic" src="assets/ui/ic-play.webp?v=3" alt="">
-        <span>Поехали!</span>
+      <button class="btn btn-primary btn-play" id="btn-levels">
+        <img class="btn-pic" src="assets/ui/ic-play.webp?v=5" alt="">
+        <span>Уровни</span>
       </button>
       <div class="btn-row">
         <button class="btn btn-tile" id="btn-garage">
-          <img class="btn-pic" src="assets/ui/ic-garage.webp?v=3" alt="">
+          <img class="btn-pic" src="assets/ui/ic-garage.webp?v=5" alt="">
           <span>Гараж</span>
         </button>
         <button class="btn btn-tile" id="btn-help">
-          <img class="btn-pic" src="assets/ui/ic-help.webp?v=3" alt="">
+          <img class="btn-pic" src="assets/ui/ic-help.webp?v=5" alt="">
           <span>Как играть</span>
         </button>
       </div>
+      <button class="btn btn-ghost" id="btn-play">♾️ Бесконечный заезд</button>
       <button class="btn btn-link" id="btn-sound">🔊 Звук</button>
     </div>
   </section>
@@ -82,6 +83,17 @@
     <div class="garage-list" id="garage-list"></div>
   </section>
 
+  <!-- УРОВНИ -->
+  <section class="screen" id="screen-levels">
+    <header class="topbar">
+      <button class="icon-btn" data-back>←</button>
+      <h2>Уровни</h2>
+      <span class="gems-badge" id="levels-stars">0 ⭐</span>
+    </header>
+    <p class="garage-count" id="levels-hint">Каждый уровень едет под свою музыку</p>
+    <div class="level-list" id="level-list"></div>
+  </section>
+
   <!-- КАК ИГРАТЬ -->
   <section class="screen" id="screen-help">
     <header class="topbar">
@@ -91,7 +103,7 @@
     </header>
     <div class="help">
       <div class="help-card">
-        <img class="help-pic" src="assets/ui/ic-help.webp?v=3" alt="">
+        <img class="help-pic" src="assets/ui/ic-help.webp?v=5" alt="">
         <div><b>Веди пальцем</b><span>Машинка едет за пальцем. На компьютере — стрелки ← →</span></div>
       </div>
       <div class="help-card help-good">
@@ -120,6 +132,10 @@
   <!-- ИГРА -->
   <section class="screen screen-game" id="screen-game">
     <canvas id="canvas"></canvas>
+    <div class="track-bar" id="track-bar" hidden>
+      <i id="track-fill"></i>
+      <b id="track-name"></b>
+    </div>
     <div class="hud">
       <div class="hud-left">
         <div class="hud-score" id="hud-score">0</div>
@@ -149,9 +165,12 @@
     <div class="modal">
       <div class="over-emoji" id="over-emoji">🏁</div>
       <h2 id="over-title">Заезд окончен</h2>
+      <div class="over-stars" id="over-stars" hidden></div>
       <div class="over-score" id="over-score">0</div>
       <p class="over-line" id="over-line">Собрано 0 💎</p>
       <button class="btn btn-primary" id="btn-again">Ещё раз 🔁</button>
+      <button class="btn btn-ghost" id="btn-next" hidden>Следующий уровень →</button>
+      <button class="btn btn-ghost" id="btn-challenge" hidden>👻 Вызвать друга</button>
       <div class="btn-row">
         <button class="btn btn-ghost" id="btn-over-garage">🚗 Гараж</button>
         <button class="btn btn-ghost" id="btn-over-menu">Меню</button>
@@ -162,8 +181,12 @@
 </div>
 
 <!-- ?v= поднимать при каждом заметном обновлении: иначе телефон показывает старую версию из кэша -->
-<script src="js/cars.js?v=3"></script>
-<script src="js/game.js?v=3"></script>
-<script src="js/app.js?v=3"></script>
+<script src="js/platform.js?v=5"></script>
+<script src="js/cars.js?v=5"></script>
+<script src="js/levels.js?v=5"></script>
+<script src="js/music.js?v=5"></script>
+<script src="js/ghosts.js?v=5"></script>
+<script src="js/game.js?v=5"></script>
+<script src="js/app.js?v=5"></script>
 </body>
 </html>

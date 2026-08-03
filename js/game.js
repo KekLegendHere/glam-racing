@@ -8,6 +8,14 @@
   const rand = (a, b) => a + Math.random() * (b - a);
   const pick = arr => arr[(Math.random() * arr.length) | 0];
 
+  /** Осветляет (k>0) или затемняет (k<0) цвет #rrggbb — темы уровней задают один тон. */
+  function shade(hex, k) {
+    const n = parseInt(hex.slice(1), 16);
+    const f = c => clamp(Math.round(c + (k > 0 ? (255 - c) * k : c * k)), 0, 255);
+    return '#' + [f(n >> 16 & 255), f(n >> 8 & 255), f(n & 255)]
+      .map(c => c.toString(16).padStart(2, '0')).join('');
+  }
+
   const Game = {
     canvas: null, ctx: null,
     W: 0, H: 0, dpr: 1,
@@ -67,9 +75,29 @@
       c.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
     },
 
-    start(car) {
+    /**
+     * Заезд. level — уровень из window.LEVELS; без него запускается бесконечный режим.
+     * В режиме уровня всё время меряется в долях такта: скорость дороги, спавн и
+     * призрак живут по музыкальным часам, поэтому машина едет строго под трек.
+     */
+    start(car, level) {
       this.resize();
       this.car = car;
+      this.mode = level ? 'level' : 'endless';
+      this.level = level || null;
+      this.pattern = level ? window.buildLevelPattern(level) : null;
+      this.totalGems = this.pattern ? window.countLevelGems(this.pattern) : 0;
+      this.nextStep = 0;
+      this.beats = 0;
+      this.won = false;
+      this.rival = level ? window.Ghosts.rival(level.id) : null;
+      this.rivalX = null;
+      if (level) {
+        window.Music.start(level);
+        window.Ghosts.startRecording(level.id);
+      } else {
+        window.Music.stop();
+      }
       this.p = {
         x: this.laneX(1),
         y: this.H * 0.76,
@@ -109,6 +137,23 @@
       return base * carK * (this.boost > 0 ? 1.42 : 1);
     },
 
+    /** Расстояние, которое дорога проходит за одну долю такта. */
+    beatDistance() { return this.S * 1.9; },
+
+    /**
+     * Скорость дороги в пикселях за секунду.
+     * На уровне её диктует темп трека, поэтому препятствия приходят точно на долю.
+     * Ускорение от звезды здесь не трогает скорость — иначе музыка разъедется с трассой;
+     * вместо этого звезда даёт неуязвимость и двойные очки.
+     */
+    roadSpeed() {
+      if (this.mode === 'level') return this.beatDistance() * this.level.bpm / 60;
+      return this.H * this.speedFactor();
+    },
+
+    /** За сколько долей до своей ноты объект должен появиться сверху экрана. */
+    spawnLead() { return (this.p.y + this.S) / this.beatDistance(); },
+
     loop(now) {
       if (!this.running || this.paused) return;
       let dt = (now - this.last) / 1000;
@@ -121,8 +166,8 @@
 
     update(dt) {
       this.time += dt;
-      const k = this.speedFactor();
-      const v = this.H * k;                 // пикселей в секунду
+      const v = this.roadSpeed();           // пикселей в секунду
+      if (this.mode === 'level') this.beats = window.Music.beatsElapsed();
       this.dist += v * dt * 0.1;
       this.scroll = (this.scroll + v * dt) % 1e6;
       this.score += v * dt * 0.02 * (this.boost > 0 ? 2 : 1);
@@ -150,11 +195,16 @@
       p.x = clamp(p.x, minX, maxX);
 
       /* --- спавн --- */
-      this.spawnGap -= v * dt;
-      if (this.spawnGap <= 0) {
-        this.spawnRow();
-        const density = 1 - Math.min(0.35, this.dist / 26000);
-        this.spawnGap = this.S * rand(2.2, 3.6) * density + this.S * 1.2;
+      if (this.mode === 'level') {
+        this.spawnByBeats();
+        this.recordAndRunGhost();
+      } else {
+        this.spawnGap -= v * dt;
+        if (this.spawnGap <= 0) {
+          this.spawnRow();
+          const density = 1 - Math.min(0.35, this.dist / 26000);
+          this.spawnGap = this.S * rand(2.2, 3.6) * density + this.S * 1.2;
+        }
       }
 
       /* --- объекты --- */
@@ -232,6 +282,81 @@
       }
 
       this.pushHud();
+    },
+
+    /**
+     * Выпускает ряды уровня. Шаг i должен доехать до игрока ровно на i-й доле,
+     * поэтому выпускаем его на spawnLead() долей раньше.
+     */
+    spawnByBeats() {
+      const due = this.beats + this.spawnLead();
+      while (this.nextStep < this.pattern.length && this.nextStep <= due) {
+        this.spawnStep(this.pattern[this.nextStep]);
+        this.nextStep++;
+      }
+      /* Трек доигран и последний ряд миновал игрока — уровень пройден. */
+      if (this.nextStep >= this.pattern.length && this.beats >= this.level.beats) {
+        this.finishLevel();
+      }
+    },
+
+    spawnStep(step) {
+      const S = this.S;
+      for (const b of step.blocks) {
+        if (b.type === 'hole') {
+          this.objects.push({
+            kind: 'block', type: 'hole', lane: b.lane,
+            x: this.laneX(b.lane), y: -S, rel: 0, r: S * rand(0.24, 0.31),
+            shape: Array.from({ length: 11 }, () => rand(0.72, 1.12)),
+            squash: rand(0.62, 0.82)
+          });
+        } else {
+          this.objects.push({
+            kind: 'block', type: 'traffic', lane: b.lane,
+            x: this.laneX(b.lane), y: -S,
+            /* На уровне попутные машины стоят на своих долях: собственная
+               скорость сломала бы ритм, ради которого всё и затевалось. */
+            rel: 0,
+            sprite: pick(window.CARS).id,
+            hue: pick(['#8fb6ff', '#a0e7c4', '#ffc48f', '#d3b3ff', '#ff9aa8', '#bfc7d4'])
+          });
+        }
+      }
+      for (const p of step.pickups) {
+        this.objects.push({
+          kind: 'pickup', type: p.type, lane: p.lane,
+          x: this.laneX(p.lane), y: -S, rel: 0,
+          r: S * (p.type === 'gem' ? 0.13 : 0.17), phase: Math.random() * 6.28
+        });
+      }
+    },
+
+    /** Пишет дорожку своего заезда и двигает призрака-соперника. */
+    recordAndRunGhost() {
+      const norm = (this.p.x - this.margin) / this.roadW;
+      window.Ghosts.sample(this.beats, norm);
+      if (this.rival) {
+        const rx = window.Ghosts.positionAt(this.rival, this.beats);
+        this.rivalX = rx == null ? null : this.margin + rx * this.roadW;
+      }
+    },
+
+    finishLevel() {
+      if (this.won) return;
+      this.won = true;
+      this.stop();
+      window.Music.stop();
+      window.Music.fanfare(true);
+      const stars = window.levelStars(this.gems, this.totalGems, this.lives);
+      const ghost = window.Ghosts.finish({
+        name: this.playerName || 'Ты', car: this.car.id,
+        score: Math.floor(this.score), gems: this.gems, stars
+      });
+      if (this.onOver) this.onOver({
+        win: true, level: this.level.id, stars,
+        score: Math.floor(this.score), gems: this.gems,
+        totalGems: this.totalGems, dist: Math.floor(this.dist), ghost
+      });
     },
 
     /* полоса занята, если сверху ещё висит недавно заспавненный объект */
@@ -324,9 +449,15 @@
       if (navigator.vibrate) { try { navigator.vibrate(60); } catch (e) {} }
       if (this.lives <= 0) {
         this.stop();
+        window.Music.stop();
+        if (this.mode === 'level') window.Music.fanfare(false);
         if (this.onOver) this.onOver({
+          win: false,
+          level: this.level ? this.level.id : null,
+          stars: 0,
           score: Math.floor(this.score),
           gems: this.gems,
+          totalGems: this.totalGems || 0,
           dist: Math.floor(this.dist)
         });
       }
@@ -348,8 +479,11 @@
         score: Math.floor(this.score),
         gems: this.gems,
         lives: this.lives,
-        speed: Math.round(this.speedFactor() * 100),
-        boost: this.boost > 0
+        speed: Math.round((this.mode === 'level' ? this.roadSpeed() / this.H : this.speedFactor()) * 100),
+        boost: this.boost > 0,
+        mode: this.mode,
+        totalGems: this.totalGems,
+        progress: this.mode === 'level' ? clamp(this.beats / this.level.beats, 0, 1) : 0
       });
     },
 
@@ -358,10 +492,11 @@
       const ctx = this.ctx, W = this.W, H = this.H, S = this.S;
       const m = this.margin, rw = this.roadW;
 
+      const th = (this.level && this.level.theme) || null;
       const sky = ctx.createLinearGradient(0, 0, 0, H);
-      sky.addColorStop(0, '#33124d');
-      sky.addColorStop(0.45, '#5a1f63');
-      sky.addColorStop(1, '#b0447c');
+      sky.addColorStop(0, th ? th.skyTop : '#33124d');
+      sky.addColorStop(0.45, th ? th.road : '#5a1f63');
+      sky.addColorStop(1, th ? th.skyBottom : '#b0447c');
       ctx.fillStyle = sky;
       ctx.fillRect(0, 0, W, H);
 
@@ -380,20 +515,24 @@
       ctx.restore();
 
       /* дорога */
+      const roadMid = th ? th.road : '#3a2551';
+      const roadEdge = shade(roadMid, -0.22);
       const road = ctx.createLinearGradient(m, 0, m + rw, 0);
-      road.addColorStop(0, '#2b1b3d');
-      road.addColorStop(0.5, '#3a2551');
-      road.addColorStop(1, '#2b1b3d');
+      road.addColorStop(0, roadEdge);
+      road.addColorStop(0.5, roadMid);
+      road.addColorStop(1, roadEdge);
       ctx.fillStyle = road;
       ctx.fillRect(m, 0, rw, H);
 
-      /* неоновые бордюры */
-      ctx.fillStyle = '#ff5fa2';
+      /* Неоновые бордюры вспыхивают на долю такта — трасса дышит вместе с треком. */
+      const kerb = th ? th.kerb : '#ff5fa2';
+      const pulse = this.mode === 'level' ? 1 - window.Music.beatPhase() : 0.35;
+      ctx.fillStyle = kerb;
       ctx.fillRect(m - 4, 0, 4, H);
       ctx.fillRect(m + rw, 0, 4, H);
       ctx.save();
-      ctx.globalAlpha = 0.35;
-      ctx.shadowColor = '#ff5fa2'; ctx.shadowBlur = 18;
+      ctx.globalAlpha = 0.25 + pulse * 0.5;
+      ctx.shadowColor = kerb; ctx.shadowBlur = 12 + pulse * 22;
       ctx.fillRect(m - 4, 0, 4, H);
       ctx.fillRect(m + rw, 0, 4, H);
       ctx.restore();
@@ -408,6 +547,9 @@
           ctx.fillRect(x, y + d0, 4, dash);
         }
       }
+
+      /* призрак — под объектами, чтобы не загораживать трассу */
+      if (this.rivalX != null) this.drawGhost();
 
       /* объекты */
       for (const o of this.objects) {
@@ -440,6 +582,25 @@
         ctx.restore();
       }
       this.drawCar(p.x, p.y, S * 1.06, this.car.id, this.car.color, p.tilt, blink ? 0.35 : 1);
+    },
+
+    /** Соперник: полупрозрачная машина с подписью — видно, где он проходил это место. */
+    drawGhost() {
+      const ctx = this.ctx, S = this.S;
+      const g = this.rival;
+      const y = this.p.y;
+      ctx.save();
+      ctx.globalAlpha = 0.42;
+      this.drawCar(this.rivalX, y, S * 1.06, g.car, '#bcd8ff', 0, 1);
+      ctx.restore();
+      ctx.save();
+      ctx.globalAlpha = 0.85;
+      ctx.font = '600 ' + Math.round(S * 0.16) + 'px Nunito, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#dceaff';
+      ctx.shadowColor = 'rgba(0,0,0,.7)'; ctx.shadowBlur = 6;
+      ctx.fillText(g.name, this.rivalX, y - S * 0.62);
+      ctx.restore();
     },
 
     drawCar(x, y, size, spriteId, color, tilt, alpha) {
