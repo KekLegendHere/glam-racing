@@ -210,8 +210,10 @@
       /* --- объекты --- */
       const S = this.S;
 
-      /* машина не въезжает в попутную: догоняющая перенимает скорость передней */
-      for (const b of this.objects) {
+      /* Машина не въезжает в попутную: догоняющая перенимает скорость передней.
+         На уровне скорости заданы заранее и разведены при генерации — там подстройка
+         только сдвинула бы объект с его доли. */
+      for (const b of this.mode === 'level' ? [] : this.objects) {
         if (b.type !== 'traffic') continue;
         for (const a of this.objects) {
           if (a === b || a.type !== 'traffic' || a.lane !== b.lane) continue;
@@ -285,14 +287,27 @@
     },
 
     /**
-     * Выпускает ряды уровня. Шаг i должен доехать до игрока ровно на i-й доле,
-     * поэтому выпускаем его на spawnLead() долей раньше.
+     * Выпускает содержимое уровня. Каждый объект обязан дойти до игрока на своей доле,
+     * но приближается он с разной скоростью: яма сползает вместе с асфальтом, а попутная
+     * машина едет сама и сокращает расстояние медленнее. Поэтому опережение считается
+     * для каждого объекта отдельно, и машины выпускаются заметно раньше ям.
      */
     spawnByBeats() {
-      const due = this.beats + this.spawnLead();
-      while (this.nextStep < this.pattern.length && this.nextStep <= due) {
-        this.spawnStep(this.pattern[this.nextStep]);
-        this.nextStep++;
+      const horizon = this.beats + this.spawnLead() / (1 - window.MAX_TRAFFIC_REL) + 1;
+      for (let i = this.nextStep; i < this.pattern.length && i <= horizon; i++) {
+        const step = this.pattern[i];
+        let pending = false;
+        for (const item of step.items) {
+          if (item.spawned) continue;
+          if (i - this.leadFor(item) <= this.beats) {
+            this.spawnItem(item);
+            item.spawned = true;
+          } else {
+            pending = true;
+          }
+        }
+        /* Двигаем курсор только по полностью выпущенным рядам подряд. */
+        if (!pending && i === this.nextStep) this.nextStep++;
       }
       /* Трек доигран и последний ряд миновал игрока — уровень пройден. */
       if (this.nextStep >= this.pattern.length && this.beats >= this.level.beats) {
@@ -300,33 +315,31 @@
       }
     },
 
-    spawnStep(step) {
+    /** За сколько долей до ноты выпускать объект с такой собственной скоростью. */
+    leadFor(item) {
+      return this.spawnLead() / (1 - (item.rel || 0));
+    },
+
+    spawnItem(item) {
       const S = this.S;
-      for (const b of step.blocks) {
-        if (b.type === 'hole') {
-          this.objects.push({
-            kind: 'block', type: 'hole', lane: b.lane,
-            x: this.laneX(b.lane), y: -S, rel: 0, r: S * rand(0.24, 0.31),
-            shape: Array.from({ length: 11 }, () => rand(0.72, 1.12)),
-            squash: rand(0.62, 0.82)
-          });
-        } else {
-          this.objects.push({
-            kind: 'block', type: 'traffic', lane: b.lane,
-            x: this.laneX(b.lane), y: -S,
-            /* На уровне попутные машины стоят на своих долях: собственная
-               скорость сломала бы ритм, ради которого всё и затевалось. */
-            rel: 0,
-            sprite: pick(window.CARS).id,
-            hue: pick(['#8fb6ff', '#a0e7c4', '#ffc48f', '#d3b3ff', '#ff9aa8', '#bfc7d4'])
-          });
-        }
-      }
-      for (const p of step.pickups) {
+      if (item.kind === 'pickup') {
         this.objects.push({
-          kind: 'pickup', type: p.type, lane: p.lane,
-          x: this.laneX(p.lane), y: -S, rel: 0,
-          r: S * (p.type === 'gem' ? 0.13 : 0.17), phase: Math.random() * 6.28
+          kind: 'pickup', type: item.type, lane: item.lane,
+          x: this.laneX(item.lane), y: -S, rel: 0,
+          r: S * (item.type === 'gem' ? 0.13 : 0.17), phase: Math.random() * 6.28
+        });
+      } else if (item.type === 'hole') {
+        this.objects.push({
+          kind: 'block', type: 'hole', lane: item.lane,
+          x: this.laneX(item.lane), y: -S, rel: 0, r: S * item.radius,
+          shape: item.shape, squash: item.squash
+        });
+      } else {
+        this.objects.push({
+          kind: 'block', type: 'traffic', lane: item.lane,
+          x: this.laneX(item.lane), y: -S, rel: item.rel,
+          sprite: window.CARS[item.sprite % window.CARS.length].id,
+          hue: pick(['#8fb6ff', '#a0e7c4', '#ffc48f', '#d3b3ff', '#ff9aa8', '#bfc7d4'])
         });
       }
     },

@@ -161,5 +161,5 @@ window.CARS = [
 
 window.CAR_BY_ID = Object.fromEntries(window.CARS.map(c => [c.id, c]));
 /* ?v= — обход кэша браузера: поднимай вместе с версией в index.html, когда перерисованы спрайты */
-window.ASSET_V = '5';
+window.ASSET_V = '6';
 window.CAR_SPRITE = id => 'assets/cars/' + id + '.webp?v=' + window.ASSET_V;

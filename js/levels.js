@@ -96,8 +96,13 @@
 
   /**
    * Раскладка уровня по долям такта.
-   * Возвращает массив длиной level.beats; каждый элемент — что появляется на этой доле:
-   *   { blocks: [{lane, type}], pickups: [{lane, type}] }
+   * Возвращает массив длиной level.beats; каждый элемент — что приходит к игроку на этой доле:
+   *   { items: [{ kind, type, lane, rel }] }
+   *
+   * rel — доля скорости игрока: попутная машина едет сама, поэтому сближается медленнее,
+   * и выпускать её нужно раньше. Значение фиксируется здесь, чтобы движок знал заранее,
+   * за сколько долей до ноты выпускать объект.
+   *
    * Последние доли оставлены пустыми — это подъезд к финишу.
    */
   window.buildLevelPattern = function (level) {
@@ -108,9 +113,12 @@
     const heartRate = 0.05;
     let free = 1 + Math.floor(rand() * 2);     // текущая свободная полоса
     let lastBusy = -1;                         // на предыдущей доле полоса была занята?
+    /* Когда в полосе последний раз шла попутная машина. Они едут с разной скоростью,
+       поэтому две подряд в одной полосе могут догнать друг друга — разводим их по времени. */
+    const lastCar = new Array(LANES).fill(-99);
 
     for (let i = 0; i < level.beats; i++) {
-      const step = { blocks: [], pickups: [] };
+      const step = { items: [] };
 
       /* Первые четыре доли — вступление: игрок слышит бит и готовится. */
       const intro = i < 4;
@@ -129,16 +137,30 @@
 
       for (let lane = 0; lane < LANES; lane++) {
         if (lane === free || lane === free2) {
-          if (!intro && rand() < level.gemRate) step.pickups.push({ lane, type: 'gem' });
-          else if (!intro && rand() < starRate) step.pickups.push({ lane, type: 'star' });
-          else if (!intro && rand() < heartRate) step.pickups.push({ lane, type: 'heart' });
+          if (intro) continue;
+          if (rand() < level.gemRate) step.items.push({ kind: 'pickup', type: 'gem', lane, rel: 0 });
+          else if (rand() < starRate) step.items.push({ kind: 'pickup', type: 'star', lane, rel: 0 });
+          else if (rand() < heartRate) step.items.push({ kind: 'pickup', type: 'heart', lane, rel: 0 });
           continue;
         }
         if (intro || outro) continue;
         /* Две доли подряд полностью забитыми не делаем — иначе читать трассу нечем. */
         if (lastBusy === i - 1 && rand() < 0.5) continue;
         if (rand() < level.density * 2.2) {
-          step.blocks.push({ lane, type: rand() < level.holeShare ? 'hole' : 'traffic' });
+          /* В этой полосе недавно проехала машина — ставим яму, она никого не догонит. */
+          const hole = rand() < level.holeShare || i - lastCar[lane] < 4;
+          if (!hole) lastCar[lane] = i;
+          step.items.push({
+            kind: 'block',
+            type: hole ? 'hole' : 'traffic',
+            lane,
+            /* Яма — часть асфальта и стоит на месте, машина едет своим ходом. */
+            rel: hole ? 0 : 0.28 + rand() * 0.22,
+            sprite: Math.floor(rand() * 1e6),
+            shape: hole ? Array.from({ length: 11 }, () => 0.72 + rand() * 0.4) : null,
+            squash: 0.62 + rand() * 0.2,
+            radius: 0.24 + rand() * 0.07
+          });
           lastBusy = i;
         }
       }
@@ -151,9 +173,12 @@
   /** Сколько кристаллов всего на уровне — по нему считаются звёзды. */
   window.countLevelGems = function (pattern) {
     let n = 0;
-    for (const s of pattern) for (const p of s.pickups) if (p.type === 'gem') n++;
+    for (const s of pattern) for (const it of s.items) if (it.type === 'gem') n++;
     return n;
   };
+
+  /** Самая медленная попутная машина — по ней движок считает, как далеко смотреть вперёд. */
+  window.MAX_TRAFFIC_REL = 0.5;
 
   /** Звёзды за заезд: 1 — доехал, 2 — половина кристаллов, 3 — почти всё и без потерь. */
   window.levelStars = function (gems, totalGems, livesLeft) {
