@@ -80,11 +80,20 @@
      * В режиме уровня всё время меряется в долях такта: скорость дороги, спавн и
      * призрак живут по музыкальным часам, поэтому машина едет строго под трек.
      */
+    /**
+     * Заезд. level — уровень; 'chase' вместо уровня запускает погоню.
+     * Без того и другого идёт обычный бесконечный заезд.
+     */
     start(car, level, skin) {
       this.resize();
       this.car = car;
       this.skin = skin || 'base';
-      this.mode = level ? 'level' : 'endless';
+      const chase = level === 'chase';
+      if (chase) level = null;
+      this.mode = level ? 'level' : (chase ? 'chase' : 'endless');
+      /* Преследовательница стартует за нижним краем и всё время подбирается ближе. */
+      this.chaser = chase ? { y: this.H + this.S * 1.4, x: this.W / 2 } : null;
+      this.survived = 0;
       this.level = level || null;
       this.pattern = level ? window.buildLevelPattern(level) : null;
       this.totalGems = this.pattern ? window.countLevelGems(this.pattern) : 0;
@@ -96,6 +105,12 @@
       if (level) {
         window.Music.start(level);
         window.Ghosts.startRecording(level.id);
+      } else if (chase) {
+        /* У погони свой трек — быстрый и тревожный. Часами он не служит:
+           скорость дороги здесь обычная, музыка нужна для нерва. */
+        window.Music.start({
+          bpm: 148, root: 1, scale: 'minor', chords: [0, 0, 5, 3], seed: 777
+        });
       } else {
         window.Music.stop();
       }
@@ -194,6 +209,8 @@
         p.tilt += (0 - p.tilt) * Math.min(1, dt * 8);
       }
       p.x = clamp(p.x, minX, maxX);
+
+      if (this.mode === 'chase') this.updateChaser(dt);
 
       /* --- спавн --- */
       if (this.mode === 'level') {
@@ -345,6 +362,48 @@
       }
     },
 
+    /**
+     * Погоня. Соперница подбирается тем быстрее, чем дольше длится заезд, —
+     * поэтому вечно убегать нельзя, вопрос только в том, насколько хватит.
+     * Кристаллы отбрасывают её назад: это делает сбор не «приятным бонусом»,
+     * а способом выжить.
+     */
+    updateChaser(dt) {
+      const S = this.S;
+      this.survived += dt;
+      /* Первые секунды дают освоиться, дальше давление растёт неумолимо. */
+      const pressure = S * (0.16 + Math.min(1.4, this.survived / 55));
+      this.chaser.y -= pressure * dt;
+
+      /* Едет по своей полосе, но подруливает за игроком — так она читается
+         как живая соперница, а не как поднимающаяся снизу стенка. */
+      this.chaser.x += (this.p.x - this.chaser.x) * Math.min(1, dt * 1.6);
+
+      const limit = this.H + S * 1.6;
+      if (this.chaser.y > limit) this.chaser.y = limit;
+
+      if (this.chaser.y <= this.p.y + S * 0.4) this.caught();
+    },
+
+    /** Отбрасывает соперницу назад: за кристаллы и звёзды. */
+    pushChaser(k) {
+      if (!this.chaser) return;
+      this.chaser.y = Math.min(this.H + this.S * 1.6, this.chaser.y + this.S * k);
+    },
+
+    caught() {
+      this.stop();
+      window.Music.stop();
+      if (navigator.vibrate) { try { navigator.vibrate([60, 40, 90]); } catch (e) {} }
+      if (this.onOver) this.onOver({
+        chase: true,
+        survived: this.survived,
+        score: Math.floor(this.score),
+        gems: this.gems,
+        dist: Math.floor(this.dist)
+      });
+    },
+
     /** Пишет дорожку своего заезда и двигает призрака-соперника. */
     recordAndRunGhost() {
       const norm = (this.p.x - this.margin) / this.roadW;
@@ -444,10 +503,13 @@
       if (o.type === 'gem') {
         this.gems++; this.score += 15;
         this.burst(o.x, o.y, '#ff7ab8', 10);
+        this.pushChaser(0.42);
       } else if (o.type === 'star') {
         this.boost = 4; this.score += 40;
         this.burst(o.x, o.y, '#ffd166', 22);
+        this.pushChaser(2.2);
       } else {
+        this.pushChaser(1.4);
         if (this.lives < MAX_LIVES) this.lives++;
         else this.score += 60;
         this.burst(o.x, o.y, '#ff5f8f', 18);
@@ -456,6 +518,15 @@
     },
 
     crash() {
+      /* В погоне жизней нет: столкновение сбивает темп и соперница резко нагоняет. */
+      if (this.mode === 'chase') {
+        this.invuln = 1.2;
+        this.burst(this.p.x, this.p.y, '#ffffff', 22);
+        this.pushChaser(-1.2);
+        if (this.onCrash) this.onCrash(this.lives);
+        if (navigator.vibrate) { try { navigator.vibrate(60); } catch (e) {} }
+        return;
+      }
       this.lives--;
       this.invuln = 1.6;
       this.burst(this.p.x, this.p.y, '#ffffff', 26);
@@ -496,6 +567,11 @@
         speed: Math.round((this.mode === 'level' ? this.roadSpeed() / this.H : this.speedFactor()) * 100),
         boost: this.boost > 0,
         mode: this.mode,
+        survived: this.survived,
+        /* Насколько соперница близко: 0 — далеко, 1 — вот-вот достанет. */
+        danger: this.chaser
+          ? Math.max(0, Math.min(1, 1 - (this.chaser.y - this.p.y) / (this.H * 0.5)))
+          : 0,
         totalGems: this.totalGems,
         progress: this.mode === 'level' ? clamp(this.beats / this.level.beats, 0, 1) : 0
       });
@@ -564,6 +640,7 @@
 
       /* призрак — под объектами, чтобы не загораживать трассу */
       if (this.rivalX != null) this.drawGhost();
+      if (this.chaser) this.drawChaser();
 
       /* объекты */
       for (const o of this.objects) {
@@ -608,6 +685,35 @@
         ctx.restore();
       }
       this.drawCar(p.x, p.y, S * 1.06, this.car.id, this.car.color, p.tilt, blink ? 0.35 : 1, this.skin);
+    },
+
+    /**
+     * Преследовательница. Чем ближе, тем гуще красное зарево у нижнего края —
+     * опасность должна читаться боковым зрением, не отрывая взгляд от трассы.
+     */
+    drawChaser() {
+      const ctx = this.ctx, S = this.S, H = this.H;
+      const gap = (this.chaser.y - this.p.y) / (H * 0.5);
+      const danger = Math.max(0, Math.min(1, 1 - gap));
+
+      ctx.save();
+      const warn = ctx.createLinearGradient(0, H, 0, H * 0.55);
+      warn.addColorStop(0, 'rgba(255,40,90,' + (0.45 * danger).toFixed(3) + ')');
+      warn.addColorStop(1, 'rgba(255,40,90,0)');
+      ctx.fillStyle = warn;
+      ctx.fillRect(0, H * 0.55, this.W, H * 0.45);
+      ctx.restore();
+
+      ctx.save();
+      const glow = ctx.createRadialGradient(this.chaser.x, this.chaser.y, S * 0.1,
+                                            this.chaser.x, this.chaser.y, S * 0.9);
+      glow.addColorStop(0, 'rgba(255,60,110,0.55)');
+      glow.addColorStop(1, 'rgba(255,60,110,0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath(); ctx.arc(this.chaser.x, this.chaser.y, S * 0.9, 0, 6.3); ctx.fill();
+      ctx.restore();
+
+      this.drawCar(this.chaser.x, this.chaser.y, S * 1.1, 'charger', '#3a2a44', 0, 1);
     },
 
     /** Соперник: полупрозрачная машина с подписью — видно, где он проходил это место. */

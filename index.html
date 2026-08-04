@@ -8,7 +8,7 @@
 <title>Glam Racing — гонки на российских машинах</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💖</text></svg>">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="styles.css?v=9">
+<link rel="stylesheet" href="styles.css?v=10">
 </head>
 <body>
 
@@ -54,20 +54,31 @@
       </div>
 
       <button class="btn btn-primary btn-play" id="btn-levels">
-        <img class="btn-pic" src="assets/ui/ic-play.webp?v=9" alt="">
+        <img class="btn-pic" src="assets/ui/ic-play.webp?v=10" alt="">
         <span>Уровни</span>
       </button>
       <div class="btn-row">
         <button class="btn btn-tile" id="btn-garage">
-          <img class="btn-pic" src="assets/ui/ic-garage.webp?v=9" alt="">
+          <img class="btn-pic" src="assets/ui/ic-garage.webp?v=10" alt="">
           <span>Гараж</span>
         </button>
         <button class="btn btn-tile" id="btn-help">
-          <img class="btn-pic" src="assets/ui/ic-help.webp?v=9" alt="">
+          <img class="btn-pic" src="assets/ui/ic-help.webp?v=10" alt="">
           <span>Как играть</span>
         </button>
       </div>
-      <button class="btn btn-ghost" id="btn-play">♾️ Бесконечный заезд</button>
+      <button class="btn btn-daily" id="btn-daily">
+        <span class="daily-left">
+          <span class="daily-emoji">📅</span>
+          <span><b>Заезд дня</b><small id="daily-sub">Новая трасса каждый день</small></span>
+        </span>
+        <span class="daily-streak" id="daily-streak"></span>
+      </button>
+      <div class="btn-row">
+        <button class="btn btn-ghost" id="btn-play">♾️ Бесконечный</button>
+        <button class="btn btn-ghost" id="btn-chase">😼 Погоня</button>
+      </div>
+      <button class="btn btn-ghost" id="btn-awards">🏅 Достижения <span id="awards-count"></span></button>
       <button class="btn btn-link" id="btn-sound">🔊 Звук</button>
     </div>
   </section>
@@ -123,6 +134,16 @@
     <div class="level-list" id="level-list"></div>
   </section>
 
+  <!-- ДОСТИЖЕНИЯ -->
+  <section class="screen" id="screen-awards">
+    <header class="topbar">
+      <button class="icon-btn" data-back>←</button>
+      <h2>Достижения</h2>
+      <span class="gems-badge" id="awards-total">0 / 0</span>
+    </header>
+    <div class="award-list" id="award-list"></div>
+  </section>
+
   <!-- КАК ИГРАТЬ -->
   <section class="screen" id="screen-help">
     <header class="topbar">
@@ -132,7 +153,7 @@
     </header>
     <div class="help">
       <div class="help-card">
-        <img class="help-pic" src="assets/ui/ic-help.webp?v=9" alt="">
+        <img class="help-pic" src="assets/ui/ic-help.webp?v=10" alt="">
         <div><b>Веди пальцем</b><span>Машинка едет за пальцем. На компьютере — стрелки ← →</span></div>
       </div>
       <div class="help-card help-good">
@@ -168,7 +189,7 @@
     <div class="hud">
       <div class="hud-left">
         <div class="hud-score" id="hud-score">0</div>
-        <div class="hud-sub"><span id="hud-speed">0</span> км/ч</div>
+        <div class="hud-sub"><span id="hud-speed">0</span><span id="hud-unit"> км/ч</span></div>
       </div>
       <div class="hud-right">
         <div class="hud-gems" id="hud-gems">0 💎</div>
@@ -210,14 +231,16 @@
 </div>
 
 <!-- ?v= поднимать при каждом заметном обновлении: иначе телефон показывает старую версию из кэша -->
-<script src="js/platform.js?v=9"></script>
-<script src="js/cars.js?v=9"></script>
-<script src="js/skins.js?v=9"></script>
-<script src="js/upgrades.js?v=9"></script>
-<script src="js/levels.js?v=9"></script>
-<script src="js/music.js?v=9"></script>
-<script src="js/ghosts.js?v=9"></script>
-<script src="js/game.js?v=9"></script>
-<script src="js/app.js?v=9"></script>
+<script src="js/platform.js?v=10"></script>
+<script src="js/cars.js?v=10"></script>
+<script src="js/skins.js?v=10"></script>
+<script src="js/upgrades.js?v=10"></script>
+<script src="js/daily.js?v=10"></script>
+<script src="js/achievements.js?v=10"></script>
+<script src="js/levels.js?v=10"></script>
+<script src="js/music.js?v=10"></script>
+<script src="js/ghosts.js?v=10"></script>
+<script src="js/game.js?v=10"></script>
+<script src="js/app.js?v=10"></script>
 </body>
 </html>

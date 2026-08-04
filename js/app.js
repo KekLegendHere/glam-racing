@@ -8,7 +8,8 @@
   /* ---------------- сохранение ---------------- */
   const defaults = {
     gems: 0, best: 0, owned: ['vesta'], car: 'vesta', sound: true, levels: {}, name: '',
-    skins: ['base'], skin: 'base', upgrades: {}
+    skins: ['base'], skin: 'base', upgrades: {},
+    daily: null, achievements: [], chaseBest: 0
   };
   let save = Object.assign({}, defaults);
   try {
@@ -19,6 +20,7 @@
   if (!save.levels) save.levels = {};
   if (!save.skins || !save.skins.includes('base')) save.skins = ['base'].concat(save.skins || []);
   if (!save.upgrades) save.upgrades = {};
+  if (!save.achievements) save.achievements = [];
   const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) {} };
 
   /* Облако платформы — прогресс переезжает между устройствами.
@@ -150,6 +152,17 @@
     img.alt = car.name;
     img.style.filter = window.Skins.css(save.skin);
     $('#btn-sound').textContent = save.sound ? '🔊 Звук' : '🔇 Звук';
+
+    const played = window.Daily.playedToday(save);
+    const streak = (save.daily && save.daily.streak) || 0;
+    $('#daily-sub').textContent = played
+      ? 'Сегодня пройден · ' + ((save.daily && save.daily.best) || 0).toLocaleString('ru-RU')
+      : 'Новая трасса каждый день';
+    $('#daily-streak').textContent = streak ? '🔥 ' + streak : '';
+    $('#btn-daily').classList.toggle('is-done', played);
+    $('#awards-count').textContent =
+      '(' + window.Achievements.count(save) + '/' + window.Achievements.total() + ')';
+
     paintIcons();
   }
 
@@ -225,10 +238,46 @@
         }
         save.car = car.id;
         persist();
+        checkAwards();
         renderGarage();
         renderMenu();
       });
 
+      list.appendChild(el);
+    });
+  }
+
+  /* ---------------- достижения ---------------- */
+  /* Проверяем после любого события: заезда, покупки, переноса из облака.
+     Так награда не потеряется, даже если условие выполнилось задним числом. */
+  function checkAwards() {
+    const fresh = window.Achievements.check(save);
+    if (!fresh.length) return;
+    persist(); syncCloud();
+    fresh.forEach((a, i) => setTimeout(() => {
+      toast(a.icon + ' ' + a.name + ' · +' + a.reward + ' 💎');
+      beep(880 + i * 110, 0.18, 'triangle', 0.07);
+    }, i * 900));
+  }
+
+  function renderAwards() {
+    const A = window.Achievements;
+    $('#awards-total').textContent = A.count(save) + ' / ' + A.total();
+    const list = $('#award-list');
+    list.innerHTML = '';
+    window.ACHIEVEMENTS.forEach(a => {
+      const got = A.unlocked(save, a.id);
+      const p = A.progress(save, a);
+      const el = document.createElement('div');
+      el.className = 'award-card' + (got ? ' is-done' : '');
+      el.innerHTML =
+        '<span class="award-icon">' + a.icon + '</span>' +
+        '<div class="award-body">' +
+          '<b>' + a.name + (got ? ' ✓' : '') + '</b>' +
+          '<span class="award-note">' + a.note + '</span>' +
+          '<i class="award-bar"><b style="width:' + (p.done / p.goal * 100).toFixed(0) + '%"></b></i>' +
+        '</div>' +
+        '<span class="award-reward">' + (got ? '+' + a.reward : p.done + '/' + p.goal) + '</span>';
       list.appendChild(el);
     });
   }
@@ -279,6 +328,7 @@
       btn.addEventListener('click', () => {
         if (!U.buy(save, car, stat.id)) return;
         persist(); syncCloud();
+        checkAwards();
         beep(760, 0.12, 'triangle', 0.07);
         setTimeout(() => beep(1140, 0.18, 'triangle', 0.07), 90);
         if (U.maxed(save, car.id)) toast(car.name + ' прокачана полностью ✨');
@@ -337,6 +387,7 @@
         }
         save.skin = skin.id;
         persist(); syncCloud();
+        checkAwards();
         renderSkins(); renderMenu();
       });
 
@@ -382,15 +433,19 @@
         hudLives = $('#hud-lives'), hudSpeed = $('#hud-speed'),
         boostFlash = $('#boost-flash'), touchHint = $('#touch-hint');
 
-  const trackFill = $('#track-fill');
+  const trackFill = $('#track-fill'), hudUnit = $('#hud-unit');
 
   window.Game.onHud = s => {
     hudScore.textContent = s.score.toLocaleString('ru-RU');
     hudGems.textContent = s.mode === 'level'
       ? s.gems + ' / ' + s.totalGems + ' 💎'
       : s.gems + ' 💎';
-    hudLives.textContent = '💖'.repeat(Math.max(0, s.lives));
-    hudSpeed.textContent = s.speed;
+    /* В погоне жизней нет — вместо сердечек показываем, насколько близко соперница. */
+    hudLives.textContent = s.mode === 'chase'
+      ? (s.danger > 0.75 ? '😱' : s.danger > 0.45 ? '😬' : '😼')
+      : '💖'.repeat(Math.max(0, s.lives));
+    hudSpeed.textContent = s.mode === 'chase' ? Math.floor(s.survived) : s.speed;
+    hudUnit.textContent = s.mode === 'chase' ? ' сек' : ' км/ч';
     boostFlash.classList.toggle('on', s.boost);
     if (s.mode === 'level') trackFill.style.width = (s.progress * 100).toFixed(1) + '%';
   };
@@ -409,7 +464,8 @@
     persist();
     const levelRun = !!res.level;
 
-    if (levelRun) onLevelFinished(res);
+    if (res.chase) onChaseFinished(res);
+    else if (levelRun) onLevelFinished(res);
     else {
       const record = res.score > save.best;
       if (record) save.best = res.score;
@@ -425,14 +481,66 @@
       if (record) setTimeout(() => beep(990, 0.35, 'triangle', 0.08), 200);
       window.Platform.submitScore('endless', res.score);
     }
+    checkAwards();
     syncCloud();
     overlay('over');
   };
 
+  /** Итог погони: важна не дистанция, а сколько продержалась. */
+  function onChaseFinished(res) {
+    const sec = Math.floor(res.survived);
+    const record = sec > (save.chaseBest || 0);
+    if (record) save.chaseBest = sec;
+    persist();
+
+    $('#over-emoji').textContent = record ? '😼' : '💨';
+    $('#over-title').textContent = record ? 'Дольше всех!' : 'Догнала…';
+    $('#over-stars').hidden = true;
+    $('#btn-next').hidden = true;
+    $('#btn-challenge').hidden = true;
+    $('#over-score').textContent = sec + ' сек';
+    $('#over-line').textContent = 'Собрано ' + res.gems + ' 💎 · рекорд ' + (save.chaseBest || 0) + ' сек';
+    window.Platform.submitScore('chase', sec);
+  }
+
+  /** Итог заезда дня: серия и награда за неё. */
+  function onDailyFinished(res) {
+    const info = window.Daily.record(save, res);
+    save.gems += info.gems;
+    persist();
+    if (info.gems) {
+      $('#over-line').textContent = 'Награда дня: +' + info.gems + ' 💎 · серия ' + info.streak + ' 🔥';
+    } else if (!info.first) {
+      $('#over-line').textContent = 'Сегодня уже засчитан · серия ' + info.streak + ' 🔥';
+    }
+  }
+
   /** Итог уровня: звёзды, разблокировка следующего, сохранение призрака. */
   function onLevelFinished(res) {
-    const prev = save.levels[res.level] || { stars: 0, score: 0 };
-    const idx = window.LEVELS.findIndex(l => l.id === res.level);
+    const isDaily = String(res.level).indexOf('daily-') === 0;
+    const prev = (isDaily ? null : save.levels[res.level]) || { stars: 0, score: 0 };
+    const idx = isDaily ? -1 : window.LEVELS.findIndex(l => l.id === res.level);
+
+    /* Заезд дня живёт отдельно: он не должен попадать в прогресс кампании,
+       иначе «пройти все двенадцать уровней» засчиталось бы само собой. */
+    if (isDaily) {
+      if (res.ghost && res.win) {
+        res.ghost.name = playerName();
+        window.Ghosts.save(res.level, res.ghost);
+        lastGhost = res.ghost;
+      }
+      $('#over-emoji').textContent = res.win ? '📅' : '💔';
+      $('#over-title').textContent = res.win ? 'Заезд дня пройден!' : 'Не доехала…';
+      $('#over-stars').hidden = false;
+      $('#over-stars').textContent = '⭐'.repeat(res.stars) + '☆'.repeat(3 - res.stars);
+      $('#over-score').textContent = res.score.toLocaleString('ru-RU');
+      $('#over-line').textContent = 'Кристаллы: ' + res.gems + ' из ' + res.totalGems;
+      $('#btn-next').hidden = true;
+      $('#btn-challenge').hidden = !(res.win && lastGhost);
+      onDailyFinished(res);
+      if (res.win) window.Platform.submitScore('daily', res.score);
+      return;
+    }
 
     if (res.win) {
       save.levels[res.level] = {
@@ -479,9 +587,10 @@
     window.Game.playerName = playerName();
     touchHint.classList.remove('hidden');
     setTimeout(() => touchHint.classList.add('hidden'), 3200);
+    const isLevel = level && level !== 'chase';
     const bar = $('#track-bar');
-    bar.hidden = !level;
-    if (level) $('#track-name').textContent = level.name + ' · ' + level.bpm + ' BPM';
+    bar.hidden = !isLevel;
+    if (isLevel) $('#track-name').textContent = level.name + ' · ' + level.bpm + ' BPM';
     window.Music.setMuted(!save.sound);
     requestAnimationFrame(() => window.Game.start(car, level, save.skin));
     beep(520, 0.1); setTimeout(() => beep(780, 0.14), 110);
@@ -497,6 +606,9 @@
 
   /* ---------------- события ---------------- */
   $('#btn-play').addEventListener('click', () => startRace(null));
+  $('#btn-chase').addEventListener('click', () => startRace('chase'));
+  $('#btn-daily').addEventListener('click', () => startRace(window.Daily.level()));
+  $('#btn-awards').addEventListener('click', () => { renderAwards(); show('awards'); });
   $('#btn-levels').addEventListener('click', () => { renderLevels(); show('levels'); });
   $('#btn-garage').addEventListener('click', () => { renderGarage(); show('garage'); });
   $('#btn-skins').addEventListener('click', () => { renderSkins(); show('skins'); });
