@@ -8,7 +8,7 @@
   /* ---------------- сохранение ---------------- */
   const defaults = {
     gems: 0, best: 0, owned: ['vesta'], car: 'vesta', sound: true, levels: {}, name: '',
-    skins: ['base'], skin: 'base'
+    skins: ['base'], skin: 'base', upgrades: {}
   };
   let save = Object.assign({}, defaults);
   try {
@@ -18,6 +18,7 @@
   if (!save.owned.includes('vesta')) save.owned.push('vesta');
   if (!save.levels) save.levels = {};
   if (!save.skins || !save.skins.includes('base')) save.skins = ['base'].concat(save.skins || []);
+  if (!save.upgrades) save.upgrades = {};
   const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) {} };
 
   /* Облако платформы — прогресс переезжает между устройствами.
@@ -153,9 +154,15 @@
   }
 
   /* ---------------- гараж ---------------- */
-  function statBar(icon, label, value) {
+  /* Шкала до 13: заводской максимум 10 плюс три уровня прокачки.
+     Купленная часть подсвечивается отдельным цветом поверх заводской. */
+  function statBar(icon, label, value, base) {
+    const b = base == null ? value : base;
     return '<div class="bar"><span><em>' + icon + '</em>' + label + '</span>' +
-           '<i><b style="width:' + (value * 10) + '%"></b></i></div>';
+           '<i><b style="width:' + (value / 13 * 100).toFixed(1) + '%"></b>' +
+           (value > b ? '<u style="left:' + (b / 13 * 100).toFixed(1) + '%;width:' +
+                        ((value - b) / 13 * 100).toFixed(1) + '%"></u>' : '') +
+           '</i></div>';
   }
 
   function renderGarage() {
@@ -166,6 +173,8 @@
     window.CARS.forEach(car => {
       const owned = save.owned.includes(car.id);
       const selected = save.car === car.id;
+      const U = window.Upgrades;
+      const tuned = U.totalLevels(save, car.id);
       const el = document.createElement('div');
       el.className = 'car-card' + (selected ? ' is-selected' : '') + (owned ? '' : ' is-locked');
       el.innerHTML =
@@ -173,18 +182,29 @@
         '<div class="car-body">' +
           '<h3 class="car-name">' + car.name +
             (selected ? ' <span class="pill">выбрана</span>' : (owned ? '' : ' <span class="pill">' + car.price + ' 💎</span>')) +
+            (tuned ? ' <span class="pill pill-tune">' + (U.maxed(save, car.id) ? 'тюнинг ✨' : '+' + tuned) + '</span>' : '') +
             '<small>' + car.sub + '</small>' +
           '</h3>' +
           '<p class="car-note">' + car.note + '</p>' +
+          /* Полоски показывают итог с прокачкой — иначе непонятно, за что платил. */
           '<div class="bars">' +
-            statBar('🚀', 'Скорость', car.speed) +
-            statBar('🎯', 'Поворот', car.handling) +
-            statBar('🧲', 'Магнит', car.magnet) +
+            statBar('🚀', 'Скорость', U.value(save, car, 'speed'), car.speed) +
+            statBar('🎯', 'Поворот', U.value(save, car, 'handling'), car.handling) +
+            statBar('🧲', 'Магнит', U.value(save, car, 'magnet'), car.magnet) +
           '</div>' +
           '<button class="btn car-action">' +
             (selected ? 'Выбрана ✓' : owned ? 'Выбрать' : 'Купить за ' + car.price + ' 💎') +
           '</button>' +
+          (owned ? '<button class="btn car-tune">🔧 Прокачать</button>' : '') +
         '</div>';
+
+      const tuneBtn = el.querySelector('.car-tune');
+      if (tuneBtn) tuneBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        tuneCarId = car.id;
+        renderTune();
+        show('tune');
+      });
 
       const btn = el.querySelector('.car-action');
       if (selected) btn.disabled = true;
@@ -207,6 +227,62 @@
         persist();
         renderGarage();
         renderMenu();
+      });
+
+      list.appendChild(el);
+    });
+  }
+
+  /* ---------------- прокачка ---------------- */
+  let tuneCarId = null;
+
+  function renderTune() {
+    const car = window.CAR_BY_ID[tuneCarId] || window.CARS[0];
+    const U = window.Upgrades;
+    $('#tune-gems').textContent = save.gems.toLocaleString('ru-RU') + ' 💎';
+    $('#tune-img').src = window.CAR_SPRITE(car.id);
+    $('#tune-img').style.filter = window.Skins.css(save.skin);
+    $('#tune-name').textContent = car.name;
+    $('#tune-sub').textContent = U.maxed(save, car.id)
+      ? 'Прокачана полностью ✨'
+      : 'Куплено улучшений: ' + U.totalLevels(save, car.id) + ' из ' + (U.STATS.length * U.MAX_LEVEL);
+
+    const list = $('#tune-list');
+    list.innerHTML = '';
+
+    U.STATS.forEach(stat => {
+      const lvl = U.level(save, car.id, stat.id);
+      const val = U.value(save, car, stat.id);
+      const cost = U.price(car, lvl);
+      const el = document.createElement('div');
+      el.className = 'tune-card' + (lvl >= U.MAX_LEVEL ? ' is-maxed' : '');
+      /* Точками показываем купленные уровни: сразу видно, сколько ещё можно взять. */
+      const dots = Array.from({ length: U.MAX_LEVEL },
+        (_, i) => '<i class="' + (i < lvl ? 'on' : '') + '"></i>').join('');
+      el.innerHTML =
+        '<div class="tune-head">' +
+          '<span class="tune-icon">' + stat.icon + '</span>' +
+          '<div><b>' + stat.name + '</b><span class="tune-note">' + stat.note + '</span></div>' +
+          '<span class="tune-value">' + val + '</span>' +
+        '</div>' +
+        '<div class="tune-dots">' + dots + '</div>' +
+        '<button class="btn tune-action">' +
+          (cost == null ? 'Максимум ✓' : 'Улучшить за ' + cost + ' 💎') +
+        '</button>';
+
+      const btn = el.querySelector('.tune-action');
+      if (cost == null) btn.disabled = true;
+      else if (save.gems < cost) {
+        btn.disabled = true;
+        btn.textContent = 'Нужно ' + (cost - save.gems) + ' 💎';
+      }
+      btn.addEventListener('click', () => {
+        if (!U.buy(save, car, stat.id)) return;
+        persist(); syncCloud();
+        beep(760, 0.12, 'triangle', 0.07);
+        setTimeout(() => beep(1140, 0.18, 'triangle', 0.07), 90);
+        if (U.maxed(save, car.id)) toast(car.name + ' прокачана полностью ✨');
+        renderTune(); renderMenu();
       });
 
       list.appendChild(el);
@@ -396,7 +472,8 @@
   let currentLevel = null;
 
   function startRace(level) {
-    const car = window.CAR_BY_ID[save.car] || window.CARS[0];
+    /* В заезд уходит машина с прокачкой, каталог остаётся заводским. */
+    const car = window.Upgrades.tuned(save, window.CAR_BY_ID[save.car] || window.CARS[0]);
     currentLevel = level || null;
     show('game');
     window.Game.playerName = playerName();
@@ -425,6 +502,7 @@
   $('#btn-skins').addEventListener('click', () => { renderSkins(); show('skins'); });
   /* Со скинов возвращаемся в гараж — оттуда сюда и пришли. */
   $('#btn-skins-back').addEventListener('click', () => { renderGarage(); show('garage'); });
+  $('#btn-tune-back').addEventListener('click', () => { renderGarage(); show('garage'); });
   $('#btn-help').addEventListener('click', () => show('help'));
   $('#btn-sound').addEventListener('click', () => {
     save.sound = !save.sound; persist(); renderMenu();

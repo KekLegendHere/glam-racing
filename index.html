@@ -8,7 +8,7 @@
 <title>Glam Racing — гонки на российских машинах</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💖</text></svg>">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="styles.css?v=8">
+<link rel="stylesheet" href="styles.css?v=9">
 </head>
 <body>
 
@@ -54,16 +54,16 @@
       </div>
 
       <button class="btn btn-primary btn-play" id="btn-levels">
-        <img class="btn-pic" src="assets/ui/ic-play.webp?v=8" alt="">
+        <img class="btn-pic" src="assets/ui/ic-play.webp?v=9" alt="">
         <span>Уровни</span>
       </button>
       <div class="btn-row">
         <button class="btn btn-tile" id="btn-garage">
-          <img class="btn-pic" src="assets/ui/ic-garage.webp?v=8" alt="">
+          <img class="btn-pic" src="assets/ui/ic-garage.webp?v=9" alt="">
           <span>Гараж</span>
         </button>
         <button class="btn btn-tile" id="btn-help">
-          <img class="btn-pic" src="assets/ui/ic-help.webp?v=8" alt="">
+          <img class="btn-pic" src="assets/ui/ic-help.webp?v=9" alt="">
           <span>Как играть</span>
         </button>
       </div>
@@ -95,6 +95,23 @@
     <div class="skin-list" id="skin-list"></div>
   </section>
 
+  <!-- ПРОКАЧКА -->
+  <section class="screen" id="screen-tune">
+    <header class="topbar">
+      <button class="icon-btn" id="btn-tune-back">←</button>
+      <h2>Прокачка</h2>
+      <span class="gems-badge" id="tune-gems">0 💎</span>
+    </header>
+    <div class="tune-car">
+      <div class="tune-thumb"><img id="tune-img" alt=""></div>
+      <div class="tune-info">
+        <b id="tune-name">—</b>
+        <small id="tune-sub">—</small>
+      </div>
+    </div>
+    <div class="tune-list" id="tune-list"></div>
+  </section>
+
   <!-- УРОВНИ -->
   <section class="screen" id="screen-levels">
     <header class="topbar">
@@ -115,7 +132,7 @@
     </header>
     <div class="help">
       <div class="help-card">
-        <img class="help-pic" src="assets/ui/ic-help.webp?v=8" alt="">
+        <img class="help-pic" src="assets/ui/ic-help.webp?v=9" alt="">
         <div><b>Веди пальцем</b><span>Машинка едет за пальцем. На компьютере — стрелки ← →</span></div>
       </div>
       <div class="help-card help-good">
@@ -193,13 +210,14 @@
 </div>
 
 <!-- ?v= поднимать при каждом заметном обновлении: иначе телефон показывает старую версию из кэша -->
-<script src="js/platform.js?v=8"></script>
-<script src="js/cars.js?v=8"></script>
-<script src="js/skins.js?v=8"></script>
-<script src="js/levels.js?v=8"></script>
-<script src="js/music.js?v=8"></script>
-<script src="js/ghosts.js?v=8"></script>
-<script src="js/game.js?v=8"></script>
-<script src="js/app.js?v=8"></script>
+<script src="js/platform.js?v=9"></script>
+<script src="js/cars.js?v=9"></script>
+<script src="js/skins.js?v=9"></script>
+<script src="js/upgrades.js?v=9"></script>
+<script src="js/levels.js?v=9"></script>
+<script src="js/music.js?v=9"></script>
+<script src="js/ghosts.js?v=9"></script>
+<script src="js/game.js?v=9"></script>
+<script src="js/app.js?v=9"></script>
 </body>
 </html>

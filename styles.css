@@ -154,8 +154,41 @@ body{
 .bar{display:grid;grid-template-columns:82px 1fr;gap:8px;align-items:center;font-size:11px;color:var(--muted)}
 .bar span{display:flex;align-items:center;gap:5px}
 .bar em{font-style:normal;font-size:14px}
-.bar i{display:block;height:7px;border-radius:99px;background:rgba(255,255,255,.15);overflow:hidden}
+.bar i{display:block;height:7px;border-radius:99px;background:rgba(255,255,255,.15);overflow:hidden;position:relative}
 .bar i b{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--pink),var(--gold))}
+/* Купленная прокачка поверх заводской части полоски. */
+.bar i u{position:absolute;top:0;height:100%;background:#7ee8c4;border-radius:99px}
+.pill-tune{background:rgba(126,232,196,.22);color:#7ee8c4}
+
+/* ---------- прокачка ---------- */
+.tune-car{
+  display:flex;align-items:center;gap:14px;margin-bottom:14px;
+  background:var(--card);border:1px solid var(--stroke);border-radius:20px;padding:12px 14px;
+}
+.tune-thumb{width:80px;height:80px;flex:0 0 auto;display:grid;place-items:center}
+.tune-thumb img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 6px 12px rgba(0,0,0,.45))}
+.tune-info{display:flex;flex-direction:column;gap:3px;min-width:0}
+.tune-info b{font-size:19px}
+.tune-info small{color:var(--muted)}
+.tune-list{display:flex;flex-direction:column;gap:12px;padding-bottom:20px}
+.tune-card{
+  background:var(--card);border:1px solid var(--stroke);border-radius:20px;padding:14px;
+  display:flex;flex-direction:column;gap:10px;
+}
+.tune-card.is-maxed{border-color:rgba(126,232,196,.5);background:rgba(126,232,196,.10)}
+.tune-head{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center}
+.tune-head>div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.tune-head b{font-size:17px}
+.tune-icon{font-size:26px}
+.tune-note{font-size:12px;color:var(--muted);line-height:1.35}
+.tune-value{font-size:24px;font-weight:900;color:var(--gold)}
+.tune-dots{display:flex;gap:8px}
+.tune-dots i{
+  flex:1;height:8px;border-radius:99px;background:rgba(255,255,255,.15);
+}
+.tune-dots i.on{background:linear-gradient(90deg,var(--pink),#7ee8c4)}
+.tune-action{border-radius:14px;padding:12px 14px;font-size:15px}
+.car-tune{border-radius:14px;padding:10px 14px;font-size:14px;margin-top:2px}
 .car-action{border-radius:14px;padding:11px 14px;font-size:15px}
 .pill{
   font-size:11px;padding:3px 9px;border-radius:99px;background:rgba(255,209,102,.2);
