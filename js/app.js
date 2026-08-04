@@ -6,7 +6,10 @@
   const KEY = 'glam-racing-v1';
 
   /* ---------------- сохранение ---------------- */
-  const defaults = { gems: 0, best: 0, owned: ['vesta'], car: 'vesta', sound: true, levels: {}, name: '' };
+  const defaults = {
+    gems: 0, best: 0, owned: ['vesta'], car: 'vesta', sound: true, levels: {}, name: '',
+    skins: ['base'], skin: 'base'
+  };
   let save = Object.assign({}, defaults);
   try {
     const raw = localStorage.getItem(KEY);
@@ -14,6 +17,7 @@
   } catch (e) { /* приватный режим — играем без сохранения */ }
   if (!save.owned.includes('vesta')) save.owned.push('vesta');
   if (!save.levels) save.levels = {};
+  if (!save.skins || !save.skins.includes('base')) save.skins = ['base'].concat(save.skins || []);
   const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) {} };
 
   /* Облако платформы — прогресс переезжает между устройствами.
@@ -143,6 +147,7 @@
     const img = $('#menu-car-img');
     img.src = window.CAR_SPRITE(car.id);
     img.alt = car.name;
+    img.style.filter = window.Skins.css(save.skin);
     $('#btn-sound').textContent = save.sound ? '🔊 Звук' : '🔇 Звук';
     paintIcons();
   }
@@ -202,6 +207,61 @@
         persist();
         renderGarage();
         renderMenu();
+      });
+
+      list.appendChild(el);
+    });
+  }
+
+  /* ---------------- скины ---------------- */
+  function renderSkins() {
+    $('#skins-gems').textContent = save.gems.toLocaleString('ru-RU') + ' 💎';
+    const car = window.CAR_BY_ID[save.car] || window.CARS[0];
+    const list = $('#skin-list');
+    list.innerHTML = '';
+
+    window.SKINS.forEach(skin => {
+      const owned = save.skins.includes(skin.id);
+      const active = save.skin === skin.id;
+      const el = document.createElement('div');
+      el.className = 'skin-card' + (active ? ' is-selected' : '') + (owned ? '' : ' is-locked');
+      /* Превью — текущая машина игрока под этой окраской: видно, что именно покупаешь.
+         Переливающийся скин показываем анимацией, иначе он выглядел бы просто жёлтым. */
+      el.innerHTML =
+        '<div class="skin-thumb">' +
+          (skin.phases
+            ? '<img class="is-rainbow" src="' + window.CAR_SPRITE(car.id) + '" alt="">'
+            : '<img src="' + window.CAR_SPRITE(car.id) + '" alt="" ' +
+              'style="filter:' + (window.Skins.css(skin.id) || 'none') + '">') +
+        '</div>' +
+        '<div class="skin-body">' +
+          '<b>' + skin.name + (active ? ' <span class="pill">на машине</span>' : '') + '</b>' +
+          '<span class="skin-note">' + skin.note + '</span>' +
+          '<button class="btn skin-action">' +
+            (active ? 'Выбран ✓' : owned ? 'Надеть' : 'Купить за ' + skin.price + ' 💎') +
+          '</button>' +
+        '</div>';
+
+      const btn = el.querySelector('.skin-action');
+      if (active) btn.disabled = true;
+      if (!owned && save.gems < skin.price) {
+        btn.disabled = true;
+        btn.textContent = 'Нужно ' + (skin.price - save.gems) + ' 💎';
+      }
+      btn.addEventListener('click', () => {
+        if (!save.skins.includes(skin.id)) {
+          if (save.gems < skin.price) return;
+          save.gems -= skin.price;
+          save.skins.push(skin.id);
+          beep(880, 0.18, 'triangle', 0.08);
+          setTimeout(() => beep(1320, 0.22, 'triangle', 0.08), 120);
+          toast('Открыт скин: ' + skin.name + ' ✨');
+        } else {
+          beep(660, 0.1);
+        }
+        save.skin = skin.id;
+        persist(); syncCloud();
+        renderSkins(); renderMenu();
       });
 
       list.appendChild(el);
@@ -346,7 +406,7 @@
     bar.hidden = !level;
     if (level) $('#track-name').textContent = level.name + ' · ' + level.bpm + ' BPM';
     window.Music.setMuted(!save.sound);
-    requestAnimationFrame(() => window.Game.start(car, level));
+    requestAnimationFrame(() => window.Game.start(car, level, save.skin));
     beep(520, 0.1); setTimeout(() => beep(780, 0.14), 110);
   }
 
@@ -362,6 +422,9 @@
   $('#btn-play').addEventListener('click', () => startRace(null));
   $('#btn-levels').addEventListener('click', () => { renderLevels(); show('levels'); });
   $('#btn-garage').addEventListener('click', () => { renderGarage(); show('garage'); });
+  $('#btn-skins').addEventListener('click', () => { renderSkins(); show('skins'); });
+  /* Со скинов возвращаемся в гараж — оттуда сюда и пришли. */
+  $('#btn-skins-back').addEventListener('click', () => { renderGarage(); show('garage'); });
   $('#btn-help').addEventListener('click', () => show('help'));
   $('#btn-sound').addEventListener('click', () => {
     save.sound = !save.sound; persist(); renderMenu();

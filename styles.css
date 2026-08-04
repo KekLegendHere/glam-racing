@@ -162,6 +162,29 @@ body{
   color:var(--gold);font-weight:800;
 }
 
+/* ---------- скины ---------- */
+.btn-skins{margin-bottom:12px}
+.skin-list{display:flex;flex-direction:column;gap:12px;padding-bottom:20px}
+.skin-card{
+  display:grid;grid-template-columns:88px 1fr;gap:14px;align-items:center;
+  background:var(--card);border:1px solid var(--stroke);border-radius:22px;padding:14px;
+}
+.skin-card.is-selected{border-color:var(--pink);background:rgba(255,95,162,.14)}
+.skin-card.is-locked .skin-thumb{opacity:.75}
+.skin-thumb{width:88px;height:88px;display:grid;place-items:center}
+.skin-thumb img{width:100%;height:100%;object-fit:contain;
+  filter:drop-shadow(0 6px 12px rgba(0,0,0,.45))}
+/* Переливающийся скин: превью крутит оттенок так же, как он ведёт себя на трассе. */
+.skin-thumb img.is-rainbow{animation:rainbow-spin 4s linear infinite}
+@keyframes rainbow-spin{
+  from{filter:grayscale(1) sepia(1) saturate(4.5) brightness(1.08) hue-rotate(0deg)}
+  to{filter:grayscale(1) sepia(1) saturate(4.5) brightness(1.08) hue-rotate(360deg)}
+}
+.skin-body{display:flex;flex-direction:column;gap:6px;min-width:0}
+.skin-body b{font-size:17px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.skin-note{font-size:12px;color:var(--muted);line-height:1.35}
+.skin-action{border-radius:14px;padding:11px 14px;font-size:15px}
+
 /* ---------- уровни ---------- */
 .level-list{display:flex;flex-direction:column;gap:10px;padding-bottom:20px}
 .level-card{

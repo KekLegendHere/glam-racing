@@ -8,7 +8,7 @@
 <title>Glam Racing — гонки на российских машинах</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💖</text></svg>">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="styles.css?v=6">
+<link rel="stylesheet" href="styles.css?v=8">
 </head>
 <body>
 
@@ -54,16 +54,16 @@
       </div>
 
       <button class="btn btn-primary btn-play" id="btn-levels">
-        <img class="btn-pic" src="assets/ui/ic-play.webp?v=6" alt="">
+        <img class="btn-pic" src="assets/ui/ic-play.webp?v=8" alt="">
         <span>Уровни</span>
       </button>
       <div class="btn-row">
         <button class="btn btn-tile" id="btn-garage">
-          <img class="btn-pic" src="assets/ui/ic-garage.webp?v=6" alt="">
+          <img class="btn-pic" src="assets/ui/ic-garage.webp?v=8" alt="">
           <span>Гараж</span>
         </button>
         <button class="btn btn-tile" id="btn-help">
-          <img class="btn-pic" src="assets/ui/ic-help.webp?v=6" alt="">
+          <img class="btn-pic" src="assets/ui/ic-help.webp?v=8" alt="">
           <span>Как играть</span>
         </button>
       </div>
@@ -80,7 +80,19 @@
       <span class="gems-badge" id="garage-gems">0 💎</span>
     </header>
     <p class="garage-count" id="garage-count">Открыто 1 из 31</p>
+    <button class="btn btn-ghost btn-skins" id="btn-skins">✨ Скины машины</button>
     <div class="garage-list" id="garage-list"></div>
+  </section>
+
+  <!-- СКИНЫ -->
+  <section class="screen" id="screen-skins">
+    <header class="topbar">
+      <button class="icon-btn" id="btn-skins-back">←</button>
+      <h2>Скины</h2>
+      <span class="gems-badge" id="skins-gems">0 💎</span>
+    </header>
+    <p class="garage-count">Окраска применяется к любой машине из гаража</p>
+    <div class="skin-list" id="skin-list"></div>
   </section>
 
   <!-- УРОВНИ -->
@@ -103,7 +115,7 @@
     </header>
     <div class="help">
       <div class="help-card">
-        <img class="help-pic" src="assets/ui/ic-help.webp?v=6" alt="">
+        <img class="help-pic" src="assets/ui/ic-help.webp?v=8" alt="">
         <div><b>Веди пальцем</b><span>Машинка едет за пальцем. На компьютере — стрелки ← →</span></div>
       </div>
       <div class="help-card help-good">
@@ -181,12 +193,13 @@
 </div>
 
 <!-- ?v= поднимать при каждом заметном обновлении: иначе телефон показывает старую версию из кэша -->
-<script src="js/platform.js?v=6"></script>
-<script src="js/cars.js?v=6"></script>
-<script src="js/levels.js?v=6"></script>
-<script src="js/music.js?v=6"></script>
-<script src="js/ghosts.js?v=6"></script>
-<script src="js/game.js?v=6"></script>
-<script src="js/app.js?v=6"></script>
+<script src="js/platform.js?v=8"></script>
+<script src="js/cars.js?v=8"></script>
+<script src="js/skins.js?v=8"></script>
+<script src="js/levels.js?v=8"></script>
+<script src="js/music.js?v=8"></script>
+<script src="js/ghosts.js?v=8"></script>
+<script src="js/game.js?v=8"></script>
+<script src="js/app.js?v=8"></script>
 </body>
 </html>

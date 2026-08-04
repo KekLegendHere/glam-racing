@@ -80,9 +80,10 @@
      * В режиме уровня всё время меряется в долях такта: скорость дороги, спавн и
      * призрак живут по музыкальным часам, поэтому машина едет строго под трек.
      */
-    start(car, level) {
+    start(car, level, skin) {
       this.resize();
       this.car = car;
+      this.skin = skin || 'base';
       this.mode = level ? 'level' : 'endless';
       this.level = level || null;
       this.pattern = level ? window.buildLevelPattern(level) : null;
@@ -594,7 +595,19 @@
         ctx.beginPath(); ctx.arc(p.x, p.y, S * 0.85, 0, 6.3); ctx.fill();
         ctx.restore();
       }
-      this.drawCar(p.x, p.y, S * 1.06, this.car.id, this.car.color, p.tilt, blink ? 0.35 : 1);
+      /* Свечение неонового скина — под машиной, чтобы не забивать её силуэт. */
+      const glow = window.Skins.glow(this.skin);
+      if (glow && this.boost <= 0) {
+        ctx.save();
+        const g = ctx.createRadialGradient(p.x, p.y, S * 0.12, p.x, p.y, S * 0.7);
+        g.addColorStop(0, glow + 'cc');
+        g.addColorStop(1, glow + '00');
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(p.x, p.y, S * 0.7, 0, 6.3); ctx.fill();
+        ctx.restore();
+      }
+      this.drawCar(p.x, p.y, S * 1.06, this.car.id, this.car.color, p.tilt, blink ? 0.35 : 1, this.skin);
     },
 
     /** Соперник: полупрозрачная машина с подписью — видно, где он проходил это место. */
@@ -616,9 +629,11 @@
       ctx.restore();
     },
 
-    drawCar(x, y, size, spriteId, color, tilt, alpha) {
+    drawCar(x, y, size, spriteId, color, tilt, alpha, skinId) {
       const ctx = this.ctx;
-      const img = window.SPRITES && window.SPRITES[spriteId];
+      let img = window.SPRITES && window.SPRITES[spriteId];
+      /* Скин есть только у машины игрока — трафик ездит в своих заводских цветах. */
+      if (skinId && img) img = window.Skins.sprite(img, skinId, this.time);
       ctx.save();
       ctx.globalAlpha = alpha;
       ctx.translate(x, y);
@@ -628,7 +643,10 @@
       ctx.fillStyle = '#000';
       ctx.beginPath(); ctx.ellipse(0, size * 0.06, size * 0.24, size * 0.4, 0, 0, 6.3); ctx.fill();
       ctx.restore();
-      if (img && img.complete && img.naturalWidth) {
+      /* Спрайт бывает и картинкой, и холстом с наложенным скином: у холста нет
+         ни complete, ни naturalWidth, поэтому проверяем обе формы готовности. */
+      const ready = img && (img.naturalWidth ? img.complete : img.width > 0);
+      if (ready) {
         ctx.drawImage(img, -size / 2, -size / 2, size, size);
       } else {
         this.drawVectorCar(size, color);
